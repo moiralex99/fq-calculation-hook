@@ -1,0 +1,33 @@
+{
+  "name": "directus-extension-realtime-calc",
+  "version": "1.0.0",
+  "description": "Extension Directus pour calculs en temps réel sur la même fiche - Simple et rapide",
+  "keywords": [
+    "directus",
+    "directus-extension",
+    "directus-hook",
+    "calculated-fields",
+    "real-time",
+    "formulas"
+  ],
+  "type": "module",
+  "directus:extension": {
+    "type": "hook",
+    "host": "^11.0.0",
+    "source": "src/index.js",
+    "path": "dist/index.js"
+  },
+  "scripts": {
+    "build": "directus-extension build",
+    "dev": "directus-extension build -w",
+    "link": "directus-extension link",
+    "test": "node test.js"
+  },
+  "devDependencies": {
+    "@directus/extensions-sdk": "^11.0.0"
+  },
+  "dependencies": {
+    "mathjs": "^12.0.0"
+  }
+}
+

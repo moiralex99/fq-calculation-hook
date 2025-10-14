@@ -7,7 +7,9 @@ package-lock.json
 yarn.lock
 
 # Build outputs
-dist/
+# dist/ is needed for deployment (built extension bundle)
+# Remove the ignore to allow committing built files
+# dist/
 .directus-extension
 
 # IDE and Editor files
@@ -104,7 +106,7 @@ typings/
 
 # Nuxt.js build / generate output
 .nuxt
-dist
+# dist  # keep build artifacts for deployment
 
 # Gatsby files
 .cache/

@@ -442,6 +442,205 @@ test('DSLParser: Champ undefined retourne valeur falsy', () => {
   assert(result === 10 || isNaN(result), 'Undefined field should be handled');
 });
 
+test('DSLParser: Fonctions logiques alias (and/or/not)', () => {
+  const fn = parser.compile('and({{a}} > 0, or({{b}} = "ok", not({{c}})))');
+  assert(fn({ a: 5, b: 'ko', c: false }) === true, 'Should evaluate nested logical aliases');
+  assert(fn({ a: -1, b: 'ok', c: true }) === false, 'Should return false when first condition fails');
+});
+
+test('DSLParser: BETWEEN et IN', () => {
+  const betweenFn = parser.compile('between({{score}}, 10, 20)');
+  assert(betweenFn({ score: 15 }) === true, '15 should be between 10 and 20');
+  assert(betweenFn({ score: 25 }) === false, '25 should not be between 10 and 20');
+
+  const inFn = parser.compile('in({{statut}}, "nouveau", "actif", "clos")');
+  assert(inFn({ statut: 'actif' }) === true, 'Value should be found in list');
+  assert(inFn({ statut: 'archivé' }) === false, 'Value should not be found');
+});
+
+test('DSLParser: CASE_WHEN', () => {
+  const fn = parser.compile('case_when({{score}} >= 90, "A", {{score}} >= 80, "B", "C")');
+  assertEqual(fn({ score: 95 }), 'A');
+  assertEqual(fn({ score: 82 }), 'B');
+  assertEqual(fn({ score: 60 }), 'C');
+});
+
+test('DSLParser: Fonctions date (today, date_diff, date_add, date_trunc, end_of)', () => {
+  const todayFn = parser.compile('today()');
+  const todayResult = todayFn({});
+  const now = new Date();
+  const expectedToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  assertEqual(todayResult, expectedToday, 'today() should return current date (YYYY-MM-DD)');
+
+  const diffFn = parser.compile('date_diff("day", {{start}}, {{end}})');
+  assertEqual(diffFn({ start: '2025-10-01', end: '2025-10-15' }), 14, 'date_diff day should compute difference');
+
+  const addFn = parser.compile('date_add("day", 5, {{start}})');
+  assertEqual(addFn({ start: '2025-10-10' }), '2025-10-15', 'date_add day should add days');
+
+  const truncFn = parser.compile('date_trunc("month", {{start}})');
+  assertEqual(truncFn({ start: '2025-10-18' }), '2025-10-01', 'date_trunc month should return first day of month');
+
+  const endFn = parser.compile('end_of("month", {{start}})');
+  assertEqual(endFn({ start: '2025-02-10' }), '2025-02-28', 'end_of month should return last day of month');
+});
+
+test('DSLParser: Fonctions EXTRACT et START_OF/END_OF semaine', () => {
+  const extractFn = parser.compile('extract("quarter", {{date_ref}})');
+  assertEqual(extractFn({ date_ref: '2025-10-05' }), 4, 'Quarter should be 4');
+
+  const startWeekFn = parser.compile('start_of("week", {{date_ref}})');
+  assertEqual(startWeekFn({ date_ref: '2025-10-15' }), '2025-10-13', 'start_of week should return Monday');
+
+  const endWeekFn = parser.compile('end_of("week", {{date_ref}})');
+  assertEqual(endWeekFn({ date_ref: '2025-10-15' }), '2025-10-19', 'end_of week should return Sunday');
+});
+
+test('DSLParser: Fonctions texte (length, left, right, replace, regex)', () => {
+  const lengthFn = parser.compile('length({{texte}})');
+  assertEqual(lengthFn({ texte: 'Bonjour' }), 7);
+
+  const leftFn = parser.compile('left({{code}}, 3)');
+  assertEqual(leftFn({ code: 'ABC123' }), 'ABC');
+
+  const rightFn = parser.compile('right({{code}}, 2)');
+  assertEqual(rightFn({ code: 'ABC123' }), '23');
+
+  const replaceFn = parser.compile('replace({{code}}, "-", "_")');
+  assertEqual(replaceFn({ code: 'PH-001' }), 'PH_001');
+
+  const regexMatchFn = parser.compile('regex_match({{code}}, "^[A-Z]+$")');
+  assert(regexMatchFn({ code: 'TASK' }) === true, 'Regex should match uppercase string');
+  assert(regexMatchFn({ code: 'Task1' }) === false, 'Regex should fail on lowercase/number');
+
+  const regexExtractFn = parser.compile('regex_extract({{code}}, "([A-Z]+)-(\\\\d+)", 2)');
+  assertEqual(regexExtractFn({ code: 'TASK-42' }), '42', 'Should extract numeric suffix');
+
+  const regexReplaceFn = parser.compile('regex_replace({{code}}, "-\\\\d+$", "")');
+  assertEqual(regexReplaceFn({ code: 'TASK-42' }), 'TASK', 'Regex replace should strip suffix');
+});
+
+test('DSLParser: Fonctions de conversion CAST / TRY_CAST', () => {
+  const castIntFn = parser.compile('CAST({{valeur}}, "int")');
+  assertEqual(castIntFn({ valeur: '12' }), 12);
+
+  const castDateFn = parser.compile('CAST({{valeur}}, "date")');
+  assertEqual(castDateFn({ valeur: '2025-10-15T12:00:00Z' }), '2025-10-15');
+
+  const tryCastFn = parser.compile('TRY_CAST({{valeur}}, "int")');
+  assertEqual(tryCastFn({ valeur: 'abc' }), null, 'TRY_CAST should return null on invalid cast');
+});
+
+test('DSLParser: Fonctions mathématiques ADD/SUB/MUL/DIV/MOD/NEGATE/ABS', () => {
+  const addFn = parser.compile('add({{a}}, {{b}}, 5)');
+  assertEqual(addFn({ a: 3, b: 2 }), 10);
+
+  const subFn = parser.compile('sub({{a}}, {{b}}, 2)');
+  assertEqual(subFn({ a: 10, b: 3 }), 5);
+
+  const mulFn = parser.compile('mul({{a}}, {{b}})');
+  assertEqual(mulFn({ a: 4, b: 5 }), 20);
+
+  const divFn = parser.compile('div({{a}}, {{b}})');
+  assertEqual(divFn({ a: 10, b: 2 }), 5);
+  assertEqual(divFn({ a: 10, b: 0 }), null, 'div should return null when denominator is zero');
+
+  const modFn = parser.compile('mod({{a}}, {{b}})');
+  assertEqual(modFn({ a: 10, b: 3 }), 1);
+
+  const negateFn = parser.compile('negate({{a}})');
+  assertEqual(negateFn({ a: 5 }), -5);
+
+  const absFn = parser.compile('abs({{a}})');
+  assertEqual(absFn({ a: -7 }), 7);
+
+  const ceilFn = parser.compile('ceil({{a}})');
+  assertEqual(ceilFn({ a: 3.2 }), 4);
+
+  const floorFn = parser.compile('floor({{a}})');
+  assertEqual(floorFn({ a: 3.8 }), 3);
+});
+
+test('DSLParser: Fonctions IS_NULL et NOW', () => {
+  const isNullFn = parser.compile('is_null({{valeur}})');
+  assert(isNullFn({ valeur: null }) === true, 'is_null should detect null');
+  assert(isNullFn({ valeur: 0 }) === false, 'is_null should be false for zero');
+
+  const nowFn = parser.compile('now()');
+  const nowResult = nowFn({});
+  assert(typeof nowResult === 'string' && nowResult.includes('T'), 'now() should return ISO datetime string');
+});
+
+test('DSLParser: Alias de comparaison (eq, ne, lt, lte, gt, gte)', () => {
+  const eqFn = parser.compile('eq({{a}}, {{b}})');
+  assert(eqFn({ a: 5, b: 5 }) === true);
+  assert(eqFn({ a: 5, b: 3 }) === false);
+
+  const neFn = parser.compile('ne({{a}}, {{b}})');
+  assert(neFn({ a: 5, b: 3 }) === true);
+  assert(neFn({ a: 5, b: 5 }) === false);
+
+  const ltFn = parser.compile('lt({{a}}, {{b}})');
+  assert(ltFn({ a: 3, b: 5 }) === true);
+  assert(ltFn({ a: 5, b: 3 }) === false);
+
+  const lteFn = parser.compile('lte({{a}}, {{b}})');
+  assert(lteFn({ a: 3, b: 5 }) === true);
+  assert(lteFn({ a: 5, b: 5 }) === true);
+
+  const gtFn = parser.compile('gt({{a}}, {{b}})');
+  assert(gtFn({ a: 5, b: 3 }) === true);
+
+  const gteFn = parser.compile('gte({{a}}, {{b}})');
+  assert(gteFn({ a: 5, b: 3 }) === true);
+  assert(gteFn({ a: 5, b: 5 }) === true);
+});
+
+test('DSLParser: Fonctions chaînes avancées (substr, trim, concat_ws)', () => {
+  const substrFn = parser.compile('substr({{texte}}, 0, 5)');
+  assertEqual(substrFn({ texte: 'Bonjour le monde' }), 'Bonjo');
+
+  const substrNoLengthFn = parser.compile('substr({{texte}}, 8)');
+  assertEqual(substrNoLengthFn({ texte: 'Bonjour le monde' }), 'le monde');
+
+  const substringFn = parser.compile('substring({{texte}}, 0, 3)');
+  assertEqual(substringFn({ texte: 'Hello' }), 'Hel');
+
+  const trimFn = parser.compile('trim({{texte}})');
+  assertEqual(trimFn({ texte: '  test  ' }), 'test');
+
+  const ltrimFn = parser.compile('ltrim({{texte}})');
+  assertEqual(ltrimFn({ texte: '  test  ' }), 'test  ');
+
+  const rtrimFn = parser.compile('rtrim({{texte}})');
+  assertEqual(rtrimFn({ texte: '  test  ' }), '  test');
+
+  const concatWsFn = parser.compile('concat_ws(", ", {{prenom}}, {{nom}}, {{ville}})');
+  assertEqual(concatWsFn({ prenom: 'Jean', nom: 'Dupont', ville: 'Paris' }), 'Jean, Dupont, Paris');
+});
+
+test('DSLParser: Fonctions mathématiques avancées (power, sqrt, sign, greatest, least)', () => {
+  const powerFn = parser.compile('power({{base}}, {{exp}})');
+  assertEqual(powerFn({ base: 2, exp: 3 }), 8);
+  assertEqual(powerFn({ base: 10, exp: 2 }), 100);
+
+  const sqrtFn = parser.compile('sqrt({{valeur}})');
+  assertEqual(sqrtFn({ valeur: 16 }), 4);
+  assertEqual(sqrtFn({ valeur: 25 }), 5);
+  assertEqual(sqrtFn({ valeur: -1 }), null, 'sqrt should return null for negative numbers');
+
+  const signFn = parser.compile('sign({{valeur}})');
+  assertEqual(signFn({ valeur: 10 }), 1);
+  assertEqual(signFn({ valeur: -5 }), -1);
+  assertEqual(signFn({ valeur: 0 }), 0);
+
+  const greatestFn = parser.compile('greatest({{a}}, {{b}}, {{c}})');
+  assertEqual(greatestFn({ a: 5, b: 10, c: 3 }), 10);
+
+  const leastFn = parser.compile('least({{a}}, {{b}}, {{c}})');
+  assertEqual(leastFn({ a: 5, b: 10, c: 3 }), 3);
+});
+
 // ==========================================
 // Tests avancés DSLEvaluator
 // ==========================================

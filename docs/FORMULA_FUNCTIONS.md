@@ -1,5 +1,3 @@
-<!-- Copied for convenience into the extension -->
-
 # Inventaire des fonctions (Version 1 - Simple)
 
 Convention d'entrée texte -> AST:
@@ -19,7 +17,7 @@ Types de base: int, decimal, bool, string, date, datetime, any
 Note: « Sucre syntaxique »
 - Définition: alias de forme plus lisible réécrit en forme de base par le parseur (même fonctionnalité).
 - Exemples: `and(a,b)` → `(a AND b)`, `sum_if(x, c)` → `sum(x, filter=c)`, `count_if(c)` → `count(*, filter=c)`, `datediff(a,b,u)` → `date_diff(u,b,a)`.
-	Ajout: `inherit(expr, filter=cond)` → `(SELECT expr FROM cible WHERE cond LIMIT 1)`.
+  Ajout: `inherit(expr, filter=cond)` → `(SELECT expr FROM cible WHERE cond LIMIT 1)`.
 - Impact: aucune différence sur les dépendances ni le SQL généré; c’est uniquement pour le confort d’écriture.
 
 ---
@@ -226,10 +224,10 @@ Texte: IF({{date_echeance}} < today(), true, false)
 Intention: est_en_retard
 AST (simplifié):
 {
-	"type":"conditional",
-	"if":{"type":"binary_op","op":"<","left":{"type":"field","name":"date_echeance"},"right":{"type":"func_call","name":"today","args":[]}},
-	"then":{"type":"literal","value":true,"value_type":"bool"},
-	"else":{"type":"literal","value":false,"value_type":"bool"}
+  "type":"conditional",
+  "if":{"type":"binary_op","op":"<","left":{"type":"field","name":"date_echeance"},"right":{"type":"func_call","name":"today","args":[]}},
+  "then":{"type":"literal","value":true,"value_type":"bool"},
+  "else":{"type":"literal","value":false,"value_type":"bool"}
 }
 
 ### Exemple 2: Niveau urgence simple
@@ -244,9 +242,9 @@ Texte: ({{heures_faites}} / NULLIF({{heures_prevues}}, 0)) * 100
 ---
 ## 13. Format registre fonctions (extrait JSON)
 [
-	{"name":"if","category":"conditional","args":["bool","any","any"],"return":"any"},
-	{"name":"sum","category":"aggregate","args":["numeric"],"return":"numeric"},
-	{"name":"date_diff","category":"date","args":["string","date","date"],"return":"int"}
+  {"name":"if","category":"conditional","args":["bool","any","any"],"return":"any"},
+  {"name":"sum","category":"aggregate","args":["numeric"],"return":"numeric"},
+  {"name":"date_diff","category":"date","args":["string","date","date"],"return":"int"}
 ]
 
 ---
@@ -264,23 +262,22 @@ Fin.
 Objectif: réutiliser une valeur d'une collection parente (N→1) dans l'enfant, ou cascader des valeurs par défaut le long d'une hiérarchie. Il n'existe pas de mot-clé dédié « inherit » pour l'instant, mais ces patterns fonctionnent avec le DSL actuel.
 
 - Lookup parent (N→1): utiliser un agrégat sur un ensemble de cardinalité 1.
-	- Exemple (dans `Taches`, hériter du champ `priorite` du `Projets` lié):
-		- Formule (sucre recommandé): `inherit({{Projets.priorite}}, filter={{Projets.id}} = {{Taches.projet}})`
-		- Équivalent historique: `max({{Projets.priorite}}, filter={{Projets.id}} = {{Taches.projet}})`
-		- Intuition: un seul parent correspond; `max` renvoie cette unique valeur.
-	- Variante équivalente: `min(...)` ou `count_distinct(...)` selon type; privilégier `max` pour un scalaire simple.
+  - Exemple (dans `Taches`, hériter du champ `priorite` du `Projets` lié):
+    - Formule (sucre recommandé): `inherit({{Projets.priorite}}, filter={{Projets.id}} = {{Taches.projet}})`
+    - Équivalent historique: `max({{Projets.priorite}}, filter={{Projets.id}} = {{Taches.projet}})`
+    - Intuition: un seul parent correspond; `max` renvoie cette unique valeur.
+  - Variante équivalente: `min(...)` ou `count_distinct(...)` selon type; privilégier `max` pour un scalaire simple.
 
 - Cascade avec fallback: combiner `coalesce` pour appliquer une valeur locale puis remonter si vide.
-	- Exemple (dans `Taches`): `coalesce({{priorite_locale}}, max({{Projets.priorite}}, filter={{Projets.id}} = {{Taches.projet}}))`
-	- Idée générale: `coalesce(valeur_locale, lookup_parent, valeur_par_defaut)`
+  - Exemple (dans `Taches`): `coalesce({{priorite_locale}}, max({{Projets.priorite}}, filter={{Projets.id}} = {{Taches.projet}}))`
+  - Idée générale: `coalesce(valeur_locale, lookup_parent, valeur_par_defaut)`
 
 - Remontées (1→N agrégations): déjà couvert via `sum/avg/min/max/count` avec `filter=...` côté collection parente.
 
 Limitations et conseils:
 - Multi‑saut dans une seule formule (ex: `Tache → Projet → Programme`) n'est pas supporté tel quel. Préférez un pattern en deux étapes:
-	1) Dans `Projets`, calculez un champ `priorite_effective` (qui peut lui-même venir de `Programmes`).
-	2) Dans `Taches`, faites le lookup sur `Projets.priorite_effective` via `max(..., filter=...)`.
+  1) Dans `Projets`, calculez un champ `priorite_effective` (qui peut lui-même venir de `Programmes`).
+  2) Dans `Taches`, faites le lookup sur `Projets.priorite_effective` via `max(..., filter=...)`.
 - Assurez-vous que la jointure utilisée dans `filter` est bien 1→1 (clé unique) pour éviter des ambiguïtés et garantir un seul résultat.
 
 Note future: un alias de confort `inherit(expr, filter=...)` pourrait être ajouté comme sucre syntaxique pour `max(expr, filter=...)`.
-

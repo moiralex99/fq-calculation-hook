@@ -15,6 +15,9 @@ RUN npm install --no-audit --no-fund && npm run build
 # Stage 2: Image Directus finale avec l'extension
 FROM directus/directus:11
 
+# Passer en root pour installer l'extension
+USER root
+
 # Copie l'extension buildée dans le bon dossier Directus
 COPY --from=builder /build/package.json /directus/extensions/hooks/realtime-calc/package.json
 COPY --from=builder /build/dist /directus/extensions/hooks/realtime-calc/dist
@@ -23,8 +26,14 @@ COPY --from=builder /build/dist /directus/extensions/hooks/realtime-calc/dist
 WORKDIR /directus/extensions/hooks/realtime-calc
 RUN corepack enable && pnpm install --prod --no-optional
 
+# Fix permissions pour l'utilisateur node
+RUN chown -R node:node /directus/extensions
+
 # Retour au workdir Directus
 WORKDIR /directus
+
+# Revenir à l'utilisateur node (sécurité)
+USER node
 
 # Active l'auto-reload des extensions
 ENV EXTENSIONS_AUTO_RELOAD=true

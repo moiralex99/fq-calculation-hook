@@ -8,7 +8,7 @@ Remplace TOUT le contenu de ton docker-compose par ceci :
 services:
   directus:
     build:
-      context: .
+      context: https://github.com/moiralex99/fq-calculation-hook.git
       dockerfile: Dockerfile
     volumes:
       - 'directus-uploads:/directus/uploads'

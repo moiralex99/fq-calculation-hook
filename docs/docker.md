@@ -7,13 +7,11 @@ Remplace TOUT le contenu de ton docker-compose par ceci :
 ```yaml
 services:
   directus:
-    build:
-      context: https://github.com/moiralex99/fq-calculation-hook.git
-      dockerfile: Dockerfile
+    image: 'directus/directus:11'
     volumes:
       - 'directus-uploads:/directus/uploads'
+      - 'directus-extensions:/directus/extensions'
       - 'directus-templates:/directus/templates'
-      # ⚠️ PAS de directus-extensions ici (l'extension est dans l'image)
     environment:
       - SERVICE_FQDN_DIRECTUS_8055
       - KEY=${SERVICE_BASE64_64_KEY}
@@ -69,6 +67,7 @@ services:
 
 volumes:
   directus-uploads:
+  directus-extensions:
   directus-templates:
   directus-postgresql-data:
   directus-redis-data:

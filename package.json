@@ -21,7 +21,11 @@
     "build": "directus-extension build",
     "dev": "directus-extension build -w",
     "link": "directus-extension link",
-    "test": "node test.js"
+    "test": "node test.js",
+    "recalc:all": "node scripts/recalc-all.mjs",
+    "recalc:collection": "node scripts/recalc-collection.mjs",
+    "test:e2e": "node scripts/setup-e2e-tests.mjs",
+    "clean:duplicates": "node scripts/remove-duplicate-formulas.mjs"
   },
   "devDependencies": {
     "@directus/extensions-sdk": "^11.0.0"

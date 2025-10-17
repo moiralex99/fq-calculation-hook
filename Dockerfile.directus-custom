@@ -1,0 +1,31 @@
+# Dockerfile pour Directus custom avec extension realtime-calc pré-installée
+# À utiliser dans un repo séparé "directus-custom"
+
+FROM directus/directus:11
+
+# Passer en root pour installer l'extension
+USER root
+
+# Créer le dossier de l'extension
+RUN mkdir -p /directus/extensions/hooks/realtime-calc
+
+# Copier l'extension depuis le repo fq-calculation-hook
+# (tu cloneras le repo dans le même dossier que ce Dockerfile)
+COPY fq-calculation-hook/package.json /directus/extensions/hooks/realtime-calc/
+COPY fq-calculation-hook/dist /directus/extensions/hooks/realtime-calc/dist
+
+# Installer les dépendances runtime
+WORKDIR /directus/extensions/hooks/realtime-calc
+RUN corepack enable && pnpm install --prod --no-optional
+
+# Fix permissions
+RUN chown -R node:node /directus/extensions
+
+# Retour au workdir Directus
+WORKDIR /directus
+
+# Revenir à l'utilisateur node
+USER node
+
+# Variables d'environnement par défaut
+ENV EXTENSIONS_AUTO_RELOAD=true

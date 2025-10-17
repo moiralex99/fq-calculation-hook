@@ -237,7 +237,7 @@ function castValue(value, type, { strict = true } = {}) {
 export class DSLParser {
   constructor() {
     // Regex pour extraire les tokens du DSL
-    this.tokenRegex = /(\{\{[a-zA-Z0-9_\.]+\}\}|"(?:[^"\\]|\\.)*"|[0-9]+(?:\.[0-9]+)?|\b(?:IF|CASE_WHEN|COALESCE|ROUND|ABS|CEIL|FLOOR|NULLIF|IS_NULL|IN|BETWEEN|EQ|NE|LT|LTE|GT|GTE|DATE_DIFF|DATEDIFF|DATE_ADD|DATE_TRUNC|EXTRACT|START_OF|END_OF|MAKE_DATE|TODAY|NOW|UPPER|LOWER|LENGTH|LEFT|RIGHT|SUBSTR|SUBSTRING|TRIM|LTRIM|RTRIM|REPLACE|REGEX_MATCH|REGEX_EXTRACT|REGEX_REPLACE|CONCAT|CONCAT_WS|CAST|TRY_CAST|ADD|SUB|MUL|DIV|MOD|NEGATE|POWER|SQRT|SIGN|GREATEST|LEAST|AND|OR|NOT|true|false|null)\b|[+\-*\/%()=<>!,]|<=|>=|<>|!=)/gi;
+  this.tokenRegex = /(\{\{[a-zA-Z0-9_\.]+\}\}|"(?:[^"\\]|\\.)*"|[0-9]+(?:\.[0-9]+)?|\b(?:IF|CASE_WHEN|COALESCE|ROUND|ABS|CEIL|FLOOR|NULLIF|IS_NULL|IS_BLANK|IN|IN_CI|IN_ANY|BETWEEN|EQ|NE|LT|LTE|GT|GTE|DATE_DIFF|DATEDIFF|DATE_ADD|DATE_TRUNC|EXTRACT|START_OF|END_OF|MAKE_DATE|TODAY|NOW|UPPER|LOWER|LENGTH|LEFT|RIGHT|SUBSTR|SUBSTRING|TRIM|LTRIM|RTRIM|REPLACE|REGEX_MATCH|REGEX_EXTRACT|REGEX_REPLACE|CONCAT|CONCAT_WS|CAST|TRY_CAST|ADD|SUB|MUL|DIV|MOD|NEGATE|POWER|SQRT|SIGN|GREATEST|LEAST|AND|OR|NOT|true|false|null)\b|[+\-*\/%()=<>!,]|<=|>=|<>|!=)/gi;
   }
 
   /**
@@ -335,8 +335,8 @@ export class DSLParser {
     js = js.replace(/\bnot\s*\(/gi, 'NOT_FUNC(');
 
     const helperNames = [
-      'IF', 'CASE_WHEN', 'COALESCE', 'ROUND', 'ABS', 'CEIL', 'FLOOR', 'NULLIF', 'IS_NULL',
-      'IN', 'BETWEEN', 'EQ', 'NE', 'LT', 'LTE', 'GT', 'GTE',
+      'IF', 'CASE_WHEN', 'COALESCE', 'ROUND', 'ABS', 'CEIL', 'FLOOR', 'NULLIF', 'IS_NULL', 'IS_BLANK',
+      'IN', 'IN_CI', 'IN_ANY', 'BETWEEN', 'EQ', 'NE', 'LT', 'LTE', 'GT', 'GTE',
       'DATE_DIFF', 'DATEDIFF', 'DATE_ADD', 'DATE_TRUNC', 'EXTRACT',
       'START_OF', 'END_OF', 'MAKE_DATE', 'TODAY', 'NOW', 'UPPER', 'LOWER', 'LENGTH',
       'LEFT', 'RIGHT', 'SUBSTR', 'SUBSTRING', 'TRIM', 'LTRIM', 'RTRIM',
@@ -360,6 +360,61 @@ export class DSLParser {
    */
   createHelpers() {
     const helpers = {};
+    const EPSILON = 1e-7;
+
+    function normalizeBoolean(value) {
+      if (typeof value === 'boolean') return value;
+      if (typeof value === 'number') return value !== 0;
+      if (value == null) return value;
+      const s = String(value).trim().toLowerCase();
+      if (['true', '1', 'yes', 'y'].includes(s)) return true;
+      if (['false', '0', 'no', 'n'].includes(s)) return false;
+      return value;
+    }
+
+    function numbersIfPossible(a, b) {
+      const na = safeToNumber(a);
+      const nb = safeToNumber(b);
+      if (na != null && nb != null) return [na, nb];
+      return null;
+    }
+
+    function datesIfPossible(a, b) {
+      const da = ensureDate(a);
+      const db = ensureDate(b);
+      if (da && db) return [da, db];
+      return null;
+    }
+
+    function isEqual(a, b) {
+      // null-ish
+      if (a == null && b == null) return true;
+      if (a == null || b == null) return false;
+
+      // numbers (with tolerance)
+      const nums = numbersIfPossible(a, b);
+      if (nums) {
+        const [na, nb] = nums;
+        return Math.abs(na - nb) < EPSILON;
+      }
+
+      // dates
+      const dts = datesIfPossible(a, b);
+      if (dts) {
+        const [da, db] = dts;
+        return da.getTime() === db.getTime();
+      }
+
+      // booleans
+      const ba = normalizeBoolean(a);
+      const bb = normalizeBoolean(b);
+      if (typeof ba === 'boolean' && typeof bb === 'boolean') {
+        return ba === bb;
+      }
+
+      // strings / others (strict)
+      return a === b;
+    }
 
     helpers.IF = (condition, trueValue, falseValue) => (condition ? trueValue : falseValue);
 
@@ -407,42 +462,91 @@ export class DSLParser {
     helpers.NULLIF = (a, b) => (a === b ? null : a);
 
     helpers.IS_NULL = (value) => value === null || value === undefined;
+    helpers.IS_BLANK = (value) => {
+      if (value === null || value === undefined) return true;
+      if (typeof value === 'string') return value.trim() === '';
+      if (Array.isArray(value)) return value.length === 0;
+      return false;
+    };
+
+    function normalizeScalar(v) {
+      // Keep numbers as numbers; trim strings; map booleans consistently
+      if (v == null) return v;
+      if (typeof v === 'number') return v;
+      if (typeof v === 'boolean') return v;
+      const s = String(v).trim();
+      if (s === 'true' || s === 'false') return s === 'true';
+      const n = Number(s);
+      return Number.isNaN(n) ? s : n;
+    }
 
     helpers.IN = (value, ...candidates) => {
-      for (const candidate of candidates) {
-        if (Array.isArray(candidate)) {
-          if (candidate.includes(value)) return true;
-        } else if (value === candidate) {
+      const val = Array.isArray(value) ? value.map(normalizeScalar) : normalizeScalar(value);
+      const flatCandidates = candidates.flat();
+      for (const c of flatCandidates) {
+        const cand = normalizeScalar(c);
+        if (Array.isArray(val)) {
+          if (val.some((v) => v === cand)) return true;
+        } else if (val === cand) {
           return true;
         }
       }
       return false;
     };
 
+    // Case-insensitive IN for strings
+    helpers.IN_CI = (value, ...candidates) => {
+      const toLower = (v) => (v == null ? v : String(v).trim().toLowerCase());
+      const valArr = Array.isArray(value) ? value.map(toLower) : [toLower(value)];
+      const flatCandidates = candidates.flat().map(toLower);
+      return valArr.some((v) => flatCandidates.includes(v));
+    };
+
+    // Array-aware: any overlap between arrays OR membership of scalar in any array arguments
+    helpers.IN_ANY = (value, ...candidates) => {
+      const norm = (arr) => arr.map(normalizeScalar);
+      const valArr = Array.isArray(value) ? norm(value) : [normalizeScalar(value)];
+      const candArr = candidates.flat().map(normalizeScalar);
+      return valArr.some((v) => candArr.includes(v));
+    };
+
     helpers.BETWEEN = (value, lower, upper) => {
       if (value == null || lower == null || upper == null) return false;
 
-      const valueDate = ensureDate(value);
-      const lowerDate = ensureDate(lower);
-      const upperDate = ensureDate(upper);
-      if (valueDate && lowerDate && upperDate) {
-        const time = valueDate.getTime();
-        return time >= lowerDate.getTime() && time <= upperDate.getTime();
+      // Try date comparisons
+      const vd = ensureDate(value);
+      const ld = ensureDate(lower);
+      const ud = ensureDate(upper);
+      if (vd && ld && ud) {
+        let lo = ld.getTime();
+        let hi = ud.getTime();
+        if (lo > hi) [lo, hi] = [hi, lo];
+        const v = vd.getTime();
+        return v >= lo && v <= hi;
       }
 
-      const valueNumber = safeToNumber(value);
-      const lowerNumber = safeToNumber(lower);
-      const upperNumber = safeToNumber(upper);
-      if (valueNumber != null && lowerNumber != null && upperNumber != null) {
-        return valueNumber >= lowerNumber && valueNumber <= upperNumber;
+      // Try numeric comparisons
+      const vn = safeToNumber(value);
+      const ln = safeToNumber(lower);
+      const un = safeToNumber(upper);
+      if (vn != null && ln != null && un != null) {
+        let lo = ln;
+        let hi = un;
+        if (lo > hi) [lo, hi] = [hi, lo];
+        return vn >= lo && vn <= hi;
       }
 
-      return value >= lower && value <= upper;
+      // Fallback: string comparison
+      const vs = String(value);
+      let lo = String(lower);
+      let hi = String(upper);
+      if (lo > hi) [lo, hi] = [hi, lo];
+      return vs >= lo && vs <= hi;
     };
 
-    // Comparison aliases
-    helpers.EQ = (a, b) => a === b;
-    helpers.NE = (a, b) => a !== b;
+  // Comparison with tolerance/normalization
+  helpers.EQ = (a, b) => isEqual(a, b);
+  helpers.NE = (a, b) => !isEqual(a, b);
     helpers.LT = (a, b) => {
       const numA = safeToNumber(a);
       const numB = safeToNumber(b);

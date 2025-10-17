@@ -43,6 +43,13 @@ Notes:
 - Vérifie strictement la valeur SQL NULL. Une chaîne vide "" n'est pas NULL; utilisez `nullif(trim(x), "")` ou `coalesce(...)` selon le cas.
 - Si la source contient des conteneurs (JSON/array) comme `[null]`, la colonne n'est pas NULL. Préférez normaliser à l'import (recommandé) ou combiner avec `try_cast`.
 
+### is_blank(x)
+Ex: is_blank({{statut}})
+Notes:
+- Retourne vrai pour: NULL/undefined, chaîne vide (après trim), tableau vide `[]`.
+- Ne considère pas `0`, `"0"` ou `{}` comme vides.
+- Pratique pour validations et valeurs par défaut côté interface.
+
 ### nullif(a,b)
 Ex: nullif({{valeur}}, 0)
 
@@ -51,12 +58,31 @@ Deux syntaxes:
 - Fonction: `in(x, a, b, …)` → `(x IN (a,b,…))`
 - Opérateur SQL natif n’est pas parsé directement pour l’instant (utilisez la forme fonction).
 
+Améliorations moteur (runtime temps réel):
+- `in` gère aussi `x` en tableau (multi-select): vrai si au moins une valeur de `x` appartient à la liste.
+- `in_ci(x, ...)`: variante insensible à la casse (applique trim + lower sur chaînes).
+- `in_any(x, ...)`: intersection générique tableau↔liste.
+Exemples:
+- `in({{status}}, "new", "actif", "clos")`
+- `in_ci(trim({{status}}), "new", "actif", "clos")`
+- `in_any({{tags}}, "urgent", "vip")`
+
 ---
 ## 2. Comparaisons
 (eq, ne, lt, lte, gt, gte, between) — opérateurs inline préférés.
 
 ### between(x,a,b)
 Ex: between({{effort_estime}}, 1, 10) — rendu SQL: `(x BETWEEN a AND b)`
+Notes côté runtime:
+- Accepte bornes inversées: `between(x, 10, 1)` ≡ `between(x, 1, 10)`.
+- Supporte nombres et dates; fallback lexicographique pour chaînes.
+
+### eq(a,b)
+Ex: eq({{montant}}, 10.55)
+Notes côté runtime:
+- Tolérance flottante `EPSILON=1e-7` (évite 10.5500001 ≠ 10.55).
+- Booléens normalisés (1/0/"true"/"false").
+- Dates comparées sur timestamp (getTime).
 
 ---
 ## 3. Arithmétique

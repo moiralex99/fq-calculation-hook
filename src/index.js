@@ -23,6 +23,9 @@ export default ({ filter, action }, { services, exceptions, logger, database, ge
   const dslEvaluator = new DSLEvaluator(logger);
   const formulaLoader = new FormulaLoader(database, logger);
   const dependencyGraph = new DependencyGraph(logger);
+  // Garde-fou pour éviter de se re-déclencher soi-même
+  // Contient des clés `${collection}:${key}` des items que NOUS venons de mettre à jour
+  const selfUpdates = new Set();
   
   // Cache des configurations de formules et graphes de dépendances
   let formulaConfigs = {};
@@ -217,7 +220,7 @@ export default ({ filter, action }, { services, exceptions, logger, database, ge
 
   /**
    * Compare deux valeurs pour déterminer si elles sont égales
-   * Gère les cas null, undefined, NaN, et arrondis flottants
+   * Gère les cas null, undefined, NaN, arrondis flottants, et booléens (1/0 vs true/false)
    */
   function valuesAreEqual(a, b) {
     // Cas identiques
@@ -227,23 +230,32 @@ export default ({ filter, action }, { services, exceptions, logger, database, ge
     if (a == null && b == null) return true;
     if (a == null || b == null) return false;
     
+    // Normaliser les booléens (DB peut retourner 1/0 pour boolean)
+    const normalizeBoolean = (val) => {
+      if (typeof val === 'boolean') return val;
+      if (val === 1 || val === '1' || val === 'true') return true;
+      if (val === 0 || val === '0' || val === 'false') return false;
+      return val;
+    };
+    
+    const normA = normalizeBoolean(a);
+    const normB = normalizeBoolean(b);
+    
+    // Après normalisation, vérifier l'égalité stricte
+    if (normA === normB) return true;
+    
     // Cas NaN
-    if (typeof a === 'number' && typeof b === 'number') {
-      if (isNaN(a) && isNaN(b)) return true;
+    if (typeof normA === 'number' && typeof normB === 'number') {
+      if (isNaN(normA) && isNaN(normB)) return true;
       
       // Comparaison avec tolérance pour les flottants
       const epsilon = 0.0000001;
-      return Math.abs(a - b) < epsilon;
-    }
-    
-    // Cas booléens
-    if (typeof a === 'boolean' && typeof b === 'boolean') {
-      return a === b;
+      return Math.abs(normA - normB) < epsilon;
     }
     
     // Cas chaînes
-    if (typeof a === 'string' || typeof b === 'string') {
-      return String(a) === String(b);
+    if (typeof normA === 'string' || typeof normB === 'string') {
+      return String(normA) === String(normB);
     }
     
     return false;
@@ -329,6 +341,14 @@ export default ({ filter, action }, { services, exceptions, logger, database, ge
 
     // Traiter chaque item modifié
     for (const key of keys) {
+      const loopKey = `${collection}:${key}`;
+      // Si cet update vient de NOUS (updateOne suite à un calcul), on le skip pour éviter la boucle
+      if (selfUpdates.has(loopKey)) {
+        logger.debug(`[RealTime-Calc] ⏭️ Skipping self-triggered update for ${loopKey}`);
+        // Nettoyer immédiatement pour les prochains cycles
+        selfUpdates.delete(loopKey);
+        continue;
+      }
       setTimeout(async () => {
         logger.info(`[RealTime-Calc] 🔄 Starting setTimeout for ${collection}.${key}`);
         try {
@@ -373,6 +393,8 @@ export default ({ filter, action }, { services, exceptions, logger, database, ge
 
             if (Object.keys(finalUpdates).length > 0) {
               // Faire un UPDATE séparé avec les champs calculés modifiés
+              // Marquer cet item comme mis à jour par NOUS pour ignorer le prochain items.update déclenché par Directus
+              selfUpdates.add(loopKey);
               await itemsService.updateOne(key, finalUpdates);
               logger.info(`[RealTime-Calc] ✅ Updated ${collection}.${key} with calculated fields:`, finalUpdates);
             } else {

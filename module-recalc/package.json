@@ -18,6 +18,6 @@
     "directus-custom-module"
   ],
   "devDependencies": {
-    "@directus/extensions-sdk": "^11.0.0"
+    "@directus/extensions-sdk": "^16.0.0"
   }
 }

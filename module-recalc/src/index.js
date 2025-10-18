@@ -3,8 +3,8 @@ import ModuleComponent from './module.vue';
 
 export default defineModule({
   id: 'realtime-recalc-dashboard',
-  name: 'Recalc Formules',
-  icon: 'auto_graph',
+  name: 'Formula Engine',
+  icon: 'calculate',
   routes: [
     {
       path: '',

@@ -1,0 +1,23 @@
+{
+  "name": "directus-extension-realtime-recalc-module",
+  "version": "1.0.0",
+  "description": "Interface pour lancer le recalcul des formules",
+  "type": "module",
+  "directus:extension": {
+    "type": "module",
+    "path": "dist/index.js",
+    "source": "src/index.js",
+    "host": "^11.0.0"
+  },
+  "scripts": {
+    "build": "directus-extension build"
+  },
+  "keywords": [
+    "directus",
+    "directus-extension",
+    "directus-custom-module"
+  ],
+  "devDependencies": {
+    "@directus/extensions-sdk": "^11.0.0"
+  }
+}

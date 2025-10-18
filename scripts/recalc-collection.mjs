@@ -51,15 +51,8 @@ try {
 }
 
 if (!collection) {
-  console.error('Usage: node scripts/recalc-collection.mjs collection=<name> [url=...] [token=...] [batch=1..500] [filter={...}] [filterEnv=ENV] [filterFile=path.json]');
+  console.error('Usage: node scripts/recalc-collection.mjs collection=<name> [url=...] [token=...] [batch=1..500] [filter={...}] [filterEnv=ENV] [filterFile=path.json] [fields=a,b,c] [dryRun=true]');
   process.exit(1);
-}
-
-function qs(obj) {
-  return Object.entries(obj)
-    .filter(([, v]) => v !== undefined && v !== null)
-    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(typeof v === 'string' ? v : JSON.stringify(v))}`)
-    .join('&');
 }
 
 async function api(path, { method = 'GET', body } = {}) {
@@ -78,39 +71,63 @@ async function api(path, { method = 'GET', body } = {}) {
   return res.json().catch(() => ({}));
 }
 
-async function* paginateItems() {
-  let offset = 0;
-  for (;;) {
-    const query = qs({ limit: batch, offset, filter });
-    const data = await api(`/items/${encodeURIComponent(collection)}?${query}`);
-    const items = Array.isArray(data?.data) ? data.data : data;
-    if (!items?.length) break;
-    for (const it of items) yield it;
-    offset += items.length;
-    if (items.length < batch) break;
+function parseFieldsArg(raw) {
+  if (!raw) return undefined;
+  try {
+    if (raw.trim().startsWith('[')) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.map((f) => String(f)).filter(Boolean);
+      }
+    }
+  } catch (e) {
+    // fallback to comma parsing below
   }
+  return raw
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean);
 }
 
-async function touchItem(id) {
-  await api(`/items/${encodeURIComponent(collection)}/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body: {}, // no-op payload, enough to trigger post-commit hook
-  });
+function parseBooleanArg(...keys) {
+  for (const key of keys) {
+    if (key in args) {
+      return ['1', 'true', 'yes', 'on'].includes(String(args[key]).toLowerCase());
+    }
+  }
+  return false;
 }
+
+const fields = parseFieldsArg(args.fields || args.field);
+const dryRun = parseBooleanArg('dryRun', 'dryrun', 'dry-run', 'dry');
 
 (async () => {
-  const started = Date.now();
-  let count = 0;
-  for await (const item of paginateItems()) {
-    const id = item?.id ?? item?.primary_key ?? item?.uuid;
-    if (id === undefined || id === null) continue;
-    await touchItem(id);
-    count++;
-    if (count % batch === 0) console.log(`Processed ${count}...`);
+  const payload = {
+    collection,
+    batchSize: batch,
+    dryRun,
+  };
+
+  if (filter) {
+    payload.filter = filter;
   }
-  const dur = ((Date.now() - started) / 1000).toFixed(1);
-  console.log(`Done. Touched ${count} item(s) in ${collection} in ${dur}s. Check Directus logs for recalculation details.`);
-})().catch(e => {
+
+  if (fields && fields.length > 0) {
+    payload.fields = fields;
+  }
+
+  console.log(`[Recalc] Triggering endpoint for collection "${collection}"...`);
+  const result = await api('/realtime-calc/utils/realtime-calc.recalculate-collection', {
+    method: 'POST',
+    body: payload,
+  });
+
+  console.log(JSON.stringify(result, null, 2));
+
+  if (!result?.success) {
+    process.exitCode = 1;
+  }
+})().catch((e) => {
   console.error('Recalc failed:', e?.message || e);
   process.exit(1);
 });

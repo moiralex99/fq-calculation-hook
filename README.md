@@ -56,6 +56,7 @@ L'extension expose une action interne pour recalculer tous les items d'une colle
 - Nom de l'action: `realtime-calc.recalculate-collection`
 - Paramètres:
   - `collection` (string, requis): nom de la collection
+  - `fields` (array<string> | string, optionnel): liste des champs calculés à recalculer (les dépendances locales sont ajoutées automatiquement). Si omis ou vide, tous les champs locaux de la collection sont recalculés.
   - `filter` (objet Directus, optionnel): filtre pour cibler un sous-ensemble d'items
   - `batchSize` (number, optionnel, 1–500, défaut 100): pagination
   - `dryRun` (boolean, optionnel): si `true`, ne fait pas d'UPDATE mais compte ce qui serait modifié
@@ -93,6 +94,12 @@ return result; // pour l'utiliser dans les étapes suivantes du Flow
 { "collection": "test_calculs", "filter": { "quantite": { "_gt": 0 } }, "dryRun": true }
 ```
 
+- Cibler quelques champs (et leurs dépendances locales)
+
+```json
+{ "collection": "test_calculs", "fields": ["total_ttc", "montant_tva"] }
+```
+
 - Lot plus gros
 
 ```json
@@ -109,6 +116,7 @@ Résultat renvoyé:
   "updated": 87,
   "total": 200,
   "dryRun": false,
+  "fields": ["total_ht", "montant_tva", "total_ttc"],
   "message": "Updated 87 item(s) on 123 processed."
 }
 ```
@@ -186,6 +194,26 @@ npm run start
 ```
 
 L'extension charge automatiquement les formules depuis `quartz_formulas` ! 🎉
+
+### 📊 Interface d'administration "Recalc Formules"
+
+Une fois l'extension buildée et installée, un module personnalisé apparaît dans le menu Directus : **Recalc Formules**. Il permet de :
+
+- Sélectionner une collection et ses champs calculés (avec auto-complétion des dépendances)
+- Appliquer un filtre JSON (facultatif)
+- Lancer un recalcul immédiat ou en mode dry-run
+- Visualiser la réponse détaillée de l'API
+
+### 🛠️ Endpoint & CLI
+
+- Endpoint HTTP : `POST /realtime-calc/utils/realtime-calc.recalculate-collection` — accepte désormais `fields`, `filter`, `batchSize`, `dryRun`
+- Script CLI (PowerShell / Node) :
+
+```powershell
+node scripts/recalc-collection.mjs collection=test_calculs fields=total_ttc,montant_tva dryRun=true
+```
+
+Le script appelle directement l'endpoint et renvoie la réponse JSON (code de sortie ≠ 0 en cas d'échec).
 
 ## ⚙️ Configuration
 

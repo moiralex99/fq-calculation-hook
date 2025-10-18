@@ -12,10 +12,24 @@
   ],
   "type": "module",
   "directus:extension": {
-    "type": "hook",
+    "type": "bundle",
     "host": "^11.0.0",
-    "source": "src/index.js",
-    "path": "dist/index.js"
+    "path": {
+      "app": "dist/app.js",
+      "api": "dist/api.js"
+    },
+    "entries": [
+      {
+        "type": "hook",
+        "name": "realtime-calc-hook",
+        "source": "src/index.js"
+      },
+      {
+        "type": "endpoint",
+        "name": "realtime-calc",
+        "source": "src/endpoint.js"
+      }
+    ]
   },
   "scripts": {
     "build": "directus-extension build",
@@ -31,7 +45,7 @@
     "@directus/extensions-sdk": "^11.0.0"
   },
   "dependencies": {
+    "directus-extension-schema-management-module": "^2.0.1",
     "mathjs": "^12.0.0"
   }
 }
-

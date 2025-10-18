@@ -213,6 +213,44 @@ export class DependencyGraph {
   }
 
   /**
+   * Calcule la clôture des dépendances pour un ensemble de champs ciblés
+   * @param {Object} graph - Graphe de dépendances (résultat de buildGraph)
+   * @param {string[]} targetFields - Champs pour lesquels inclure les dépendances
+   * @returns {Set<string>} - Ensemble de champs calculés à traiter (champs cibles + dépendances)
+   */
+  collectDependencyClosure(graph, targetFields) {
+    const closure = new Set();
+    if (!Array.isArray(targetFields) || targetFields.length === 0) {
+      return closure;
+    }
+
+    const visit = (field) => {
+      if (!field || closure.has(field)) {
+        return;
+      }
+
+      if (graph && graph[field]) {
+        closure.add(field);
+        const deps = graph[field]?.dependencies || [];
+        for (const dep of deps) {
+          if (graph[dep]) {
+            visit(dep);
+          }
+        }
+      } else {
+        // Champ n'ayant pas de formule locale (dépendance externe) — on le garde pour info
+        closure.add(field);
+      }
+    };
+
+    for (const field of targetFields) {
+      visit(field);
+    }
+
+    return closure;
+  }
+
+  /**
    * Visualise le graphe (pour debug)
    * @param {Object} graph - Graphe de dépendances
    * @returns {string} - Représentation textuelle

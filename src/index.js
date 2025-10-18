@@ -18,6 +18,10 @@
 import { DSLEvaluator } from './dsl-parser.js';
 import { FormulaLoader } from './formula-loader.js';
 import { DependencyGraph } from './dependency-graph.js';
+import { createRecalculateHandler } from './recalc-handler.js';
+
+// Export the handler creator for endpoint use
+export { createRecalculateHandler };
 
 export default ({ filter, action }, { services, exceptions, logger, database, getSchema, env }) => {
   const dslEvaluator = new DSLEvaluator(logger);
@@ -32,6 +36,10 @@ export default ({ filter, action }, { services, exceptions, logger, database, ge
   let dependencyGraphs = {};
   // Debounce pour éviter de recharger trop souvent
   let pendingReloadTimeout = null;
+  // Promise pour suivre l'initialisation
+  let initializationPromise = null;
+  // Shared recalculation handler
+  let sharedRecalcHandler = null;
 
   // Construit les graphes à partir d'une configuration donnée et met à jour les caches globaux
   async function buildGraphsFromConfigs(configs) {
@@ -158,30 +166,56 @@ export default ({ filter, action }, { services, exceptions, logger, database, ge
    * Fonction pour calculer tous les champs d'une collection dans le bon ordre
    * Optimisé pour ne calculer que si nécessaire et ne pas écrire si inchangé
    */
-  function calculateFields(collection, data, changedFields = null) {
+  function calculateFields(collection, data, changedFields = null, options = {}) {
+    const { targetFields = null } = options;
     const config = formulaConfigs[collection];
     
     if (!config || Object.keys(config).length === 0) {
       return { updates: {}, hasChanges: false }; // Pas de configuration pour cette collection
     }
 
-    const graph = dependencyGraphs[collection];
+    const analysis = dependencyGraphs[collection];
+    const graph = analysis?.graph;
     const updates = {};
     let hasChanges = false;
+
+    const normalizedTargets = Array.isArray(targetFields)
+      ? targetFields.map(f => (typeof f === 'string' ? f : String(f))).filter(Boolean)
+      : typeof targetFields === 'string'
+        ? [targetFields]
+        : [];
+
+    let allowedTargets = null;
+    if (normalizedTargets.length > 0) {
+      const closure = dependencyGraph.collectDependencyClosure(graph, normalizedTargets);
+      if (closure.size > 0) {
+        allowedTargets = closure;
+      } else {
+        allowedTargets = new Set(normalizedTargets);
+      }
+    }
     
     // Déterminer l'ordre de calcul
-    let calculationOrder = graph?.order || Object.keys(config);
+    let calculationOrder = analysis?.order || Object.keys(config);
     
     // Optimisation: si on connaît les champs modifiés, ne recalculer que les affectés
     if (changedFields && changedFields.length > 0 && graph) {
       calculationOrder = dependencyGraph.optimizeCalculationOrder(
-        graph.graph, 
-        graph.order, 
+        graph, 
+        analysis?.order || [], 
         changedFields
       );
       
       if (calculationOrder.length === 0) {
         logger.debug(`[RealTime-Calc] No fields affected by changes in ${collection}`);
+        return { updates: {}, hasChanges: false };
+      }
+    }
+
+    if (allowedTargets) {
+      calculationOrder = calculationOrder.filter(field => allowedTargets.has(field));
+      if (calculationOrder.length === 0) {
+        logger.debug(`[RealTime-Calc] No formulas match requested fields in ${collection}: ${normalizedTargets.join(', ')}`);
         return { updates: {}, hasChanges: false };
       }
     }
@@ -496,97 +530,45 @@ export default ({ filter, action }, { services, exceptions, logger, database, ge
 
   /**
    * Action pour recalculer une collection complète à la demande
-   * Payload attendu: { collection, filter?, batchSize?, dryRun? }
+   * Payload attendu: { collection, fields?, filter?, batchSize?, dryRun? }
    */
-  action('realtime-calc.recalculate-collection', async ({ collection, filter = null, batchSize = 100, dryRun = false }, { schema, accountability }) => {
+  // Action (compat) - garde le support pour les flows existants
+  action('realtime-calc.recalculate-collection', async (args, meta) => {
     try {
-      if (!collection || typeof collection !== 'string') {
-        throw new Error('Missing or invalid "collection"');
+      if (!sharedRecalcHandler) {
+        throw new Error('Handler not initialized yet');
       }
-
-      // Charger/configurer les formules si besoin
-      if (Object.keys(formulaConfigs).length === 0) {
-        await loadFormulasAndBuildGraphs();
-      }
-      if (!formulaConfigs[collection] || Object.keys(formulaConfigs[collection]).length === 0) {
-        return { success: true, updated: 0, processed: 0, total: 0, message: `No formulas for collection ${collection}` };
-      }
-
-      const { ItemsService } = services;
-      const itemsService = new ItemsService(collection, {
-        database,
-        schema: schema || (typeof getSchema === 'function' ? await getSchema() : undefined),
-        accountability
-      });
-
-      let offset = 0;
-      const limit = Math.max(1, Math.min(500, Number(batchSize) || 100));
-      let processed = 0;
-      let updated = 0;
-      let total = 0;
-
-      // Première requête pour compter (si possible)
-      try {
-        const meta = await itemsService.readByQuery({ filter: filter || {}, limit: 0, meta: 'total_count' });
-        if (meta && meta.meta && typeof meta.meta.total_count === 'number') {
-          total = meta.meta.total_count;
-        }
-      } catch {
-        // Certains drivers ne renvoient pas meta, on continue sans
-      }
-
-      while (true) {
-        const res = await itemsService.readByQuery({
-          filter: filter || {},
-          limit,
-          offset,
-        });
-        const chunk = Array.isArray(res) ? res : (res?.data || []);
-        if (!chunk || chunk.length === 0) break;
-
-        for (const item of chunk) {
-          const { updates, hasChanges } = calculateFields(collection, item);
-          processed++;
-          if (hasChanges && Object.keys(updates).length > 0) {
-            if (!dryRun) {
-              try {
-                await itemsService.updateOne(item.id, updates);
-                updated++;
-              } catch (e) {
-                logger.error(`[RealTime-Calc] Error updating ${collection}.${item.id} during recalc:`, e?.message || e);
-              }
-            } else {
-              updated++; // Compter comme potentiellement updatable
-            }
-          }
-        }
-
-        offset += chunk.length;
-        if (chunk.length < limit) break; // dernière page
-      }
-
-      return {
-        success: true,
-        collection,
-        processed,
-        updated,
-        total,
-        dryRun,
-        message: dryRun
-          ? `Dry-run: ${updated} item(s) would be updated on ${processed} processed.`
-          : `Updated ${updated} item(s) on ${processed} processed.`
-      };
-
+      return await sharedRecalcHandler(args, meta || {});
     } catch (error) {
-      logger.error('[RealTime-Calc] ❌ Failed recalculate-collection:', error?.message || error);
+      logger.error('[RealTime-Calc] ❌ Failed recalculate-collection (action):', error?.message || error);
       return { success: false, error: error?.message || String(error) };
     }
   });
+
+  // Filter (retourne un résultat exploitable via emitter.emitFilter)
+  filter('realtime-calc.recalculate-collection', async (payload, meta) => {
+    logger.info('[RealTime-Calc] Filter invoked: realtime-calc.recalculate-collection');
+    try {
+      if (!sharedRecalcHandler) {
+        throw new Error('Handler not initialized yet');
+      }
+      return await sharedRecalcHandler(payload || {}, meta || {});
+    } catch (error) {
+      logger.error('[RealTime-Calc] ❌ Failed recalculate-collection (filter):', error?.message || error);
+      return { success: false, error: error?.message || String(error) };
+    }
+  });
+  logger.info('[RealTime-Calc] Filter attached: realtime-calc.recalculate-collection');
 
   /**
    * Action pour voir la configuration actuelle
    */
   action('realtime-calc.get-config', async () => {
+    // Attendre que l'initialisation soit terminée
+    if (initializationPromise) {
+      await initializationPromise;
+    }
+    
     const stats = {};
     
     for (const [collection, formulas] of Object.entries(formulaConfigs)) {
@@ -605,8 +587,20 @@ export default ({ filter, action }, { services, exceptions, logger, database, ge
   });
 
   // Initialisation au démarrage
-  (async () => {
+  initializationPromise = (async () => {
     const success = await loadFormulasAndBuildGraphs();
+    
+    // Create the shared handler now that we have formulas loaded
+    sharedRecalcHandler = await createRecalculateHandler({
+      services,
+      database,
+      logger,
+      getSchema,
+      formulaConfigs,
+      dependencyGraphs,
+      calculateFields,
+      dependencyGraph
+    });
     
     if (success) {
       const totalFormulas = Object.values(formulaConfigs).reduce(

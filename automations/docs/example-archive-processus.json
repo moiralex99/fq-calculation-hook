@@ -1,0 +1,49 @@
+{
+  "name": "Archive et créer nouvelle version active",
+  "collection_cible": "processus",
+  "status": "active",
+  "priority": 10,
+  "trigger_event": ["update"],
+  "description": "Quand un processus passe à 'inactif', crée automatiquement une nouvelle version active avec un titre préfixé. Pour écouter plusieurs collections, utiliser: [\"processus\", \"projets\"]",
+  "expand_fields": ["*"],
+  "rule_jsonb": {
+    "and": [
+      {
+        "in": ["status", { "var": "$CHANGED" }]
+      },
+      {
+        "===": [{ "var": "status" }, "inactif"]
+      }
+    ]
+  },
+  "actions_jsonb": [
+    {
+      "type": "create_item",
+      "collection": "processus",
+      "assign": "new_processus",
+      "data": {
+        "name": {
+          "concat": [
+            "Active version of ",
+            { "var": "name" }
+          ]
+        },
+        "status": "actif",
+        "description": {
+          "concat": [
+            "Version active créée automatiquement le ",
+            { "now": [] },
+            " depuis le processus archivé: ",
+            { "var": "name" }
+          ]
+        },
+        "domaine_lie": { "var": "domaine_lie" },
+        "code": { "var": "code" },
+        "responsable": { "var": "responsable" },
+        "date_debut": { "var": "date_debut" },
+        "date_fin": { "var": "date_fin" },
+        "priorite": { "var": "priorite" }
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "name": "Notifier création tâche ou action",
+  "collection_cible": ["taches", "actions"],
+  "status": "active",
+  "priority": 10,
+  "trigger_event": ["create"],
+  "description": "Envoie un email de notification quand une tâche OU une action est créée",
+  "expand_fields": ["responsable.*", "projet.*"],
+  "rule_jsonb": {
+    "===": [{ "var": "statut" }, "nouveau"]
+  },
+  "actions_jsonb": [
+    {
+      "type": "send_email",
+      "to": { "var": "responsable.email" },
+      "subject": {
+        "concat": [
+          "Nouvelle ",
+          { "var": "$COLLECTION" },
+          ": ",
+          { "var": "titre" }
+        ]
+      },
+      "body": {
+        "concat": [
+          "Une nouvelle ",
+          { "var": "$COLLECTION" },
+          " a été créée: ",
+          { "var": "titre" },
+          "\n\nProjet: ",
+          { "var": "projet.name" },
+          "\n\nResponsable: ",
+          { "var": "responsable.name" }
+        ]
+      }
+    }
+  ]
+}

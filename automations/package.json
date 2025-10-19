@@ -1,0 +1,31 @@
+{
+  "name": "directus-extension-automations",
+  "version": "0.1.0",
+  "description": "Automatisations simples pour Directus (JSONLogic triggers + actions set_field)",
+  "type": "module",
+  "directus:extension": {
+    "type": "hook",
+    "path": "dist/index.js",
+    "source": "src/index.js",
+    "host": "^11.0.0"
+  },
+  "scripts": {
+    "build": "directus-extension build",
+    "dev": "directus-extension build -w",
+    "test:automation": "node scripts/test-parser-evaluator.mjs",
+    "test:business": "node scripts/test-business-scenarios.mjs",
+    "test:operators": "node scripts/test-operators.mjs",
+    "test:nested": "node scripts/test-nested-lookups.mjs",
+    "test:foreach": "node scripts/test-for-each.mjs",
+    "test:archive": "node scripts/test-archive-processus.mjs",
+    "test:bulk-cascade": "node scripts/test-update-many-cascade.mjs",
+    "test:new-features": "node scripts/test-new-features.mjs",
+    "test:throttle": "node scripts/test-throttle.mjs"
+  },
+  "dependencies": {
+    "json-logic-js": "^2.0.2"
+  },
+  "devDependencies": {
+    "@directus/extensions-sdk": "^11.0.0"
+  }
+}

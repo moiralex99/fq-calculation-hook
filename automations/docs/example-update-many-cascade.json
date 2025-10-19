@@ -1,0 +1,42 @@
+[
+  {
+    "name": "Cascade date_fin → tâches (bulk)",
+    "collection_cible": "processus",
+    "status": "active",
+    "priority": 10,
+    "trigger_event": ["update"],
+    "rule": { "in": ["date_fin", { "var": "$CHANGED" }] },
+    "actions": [
+      {
+        "type": "update_many",
+        "collection": "taches",
+        "filter": { "processus_id": { "_eq": { "var": "id" } } },
+        "data": { "date_fin": { "var": "date_fin" } },
+        "assign": "bulk"
+      }
+    ]
+  },
+  {
+    "name": "Cascade calendrier → domaines (bulk avec when)",
+    "collection_cible": "calendriers",
+    "status": "active",
+    "priority": 10,
+    "trigger_event": ["update"],
+    "rule": { "in": ["date_fin", { "var": "$CHANGED" }] },
+    "actions": [
+      {
+        "type": "update_many",
+        "collection": "domaines",
+        "filter": { "calendrier_id": { "_eq": { "var": "id" } } },
+        "data": { "date_fin": { "var": "date_fin" } },
+        "when": { 
+          "or": [
+            { "in": ["date_fin", { "var": "$CHANGED" }] },
+            { "and": [ { ">": [ { "var": "date_fin" }, null ] }, { "!==": [ { "var": "date_fin" }, { "var": "$OLD.date_fin" } ] } ] }
+          ]
+        },
+        "assign": "bulk"
+      }
+    ]
+  }
+]

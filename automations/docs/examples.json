@@ -1,0 +1,116 @@
+[
+  {
+    "name": "Recalculer total commande",
+    "collection_cible": "orders",
+    "status": "active",
+    "priority": 10,
+    "trigger_event": ["update"],
+    "rule": {
+      "or": [
+        { "in": ["unit_price", { "var": "$CHANGED" }] },
+        { "in": ["quantity", { "var": "$CHANGED" }] },
+        { "in": ["discount", { "var": "$CHANGED" }] }
+      ]
+    },
+    "actions": [
+      { "type": "set_field", "field": "total", "value": { "-": [ { "*": [ { "var": "unit_price" }, { "var": "quantity" } ] }, { "var": "discount" } ] } }
+    ]
+  },
+  {
+    "name": "Notifier ticket urgent (Flow)",
+    "collection_cible": "tickets",
+    "status": "active",
+    "priority": 10,
+    "trigger_event": ["create", "update"],
+    "rule": { "and": [ { "===": [ { "var": "priority" }, "urgent" ] }, { "===": [ { "var": "status" }, "new" ] } ] },
+    "actions": [
+      { "type": "trigger_flow", "key": "notify_ticket", "payload": { "ticket_id": { "var": "id" }, "title": { "var": "title" }, "requested_by": { "var": "requester_email" } } },
+      { "type": "create_item", "collection": "tasks", "data": { "title": { "concat": ["Follow-up: ", { "var": "title" }] }, "ticket_id": { "var": "id" }, "due_at": { "date_add": [ { "now": [] }, 1, "days" ] }, "assigned_to": "$USER.id" } }
+    ]
+  },
+  {
+    "name": "Clôture commande et notification client",
+    "collection_cible": "orders",
+    "status": "active",
+    "priority": 20,
+    "trigger_event": ["update"],
+    "rule": { "and": [ { "changed_to": [ "status", "done", { "var": "$CHANGED" }, { "__ctx": [] } ] }, { ">": [ { "var": "total" }, { "var": "threshold" } ] } ] },
+    "actions": [
+      { "type": "set_field", "field": "closed_at", "value": "NOW()" },
+      { "type": "send_email", "to": { "var": "customer_email" }, "subject": "Order completed", "body": "Your order is completed." }
+    ]
+  },
+  {
+    "name": "Somme M2M lignes -> montant total",
+    "collection_cible": "orders",
+    "status": "active",
+    "priority": 30,
+    "trigger_event": ["update"],
+    "rule": { "in": ["id", { "var": "$CHANGED" }] },
+    "actions": [
+      {
+        "type": "set_field",
+        "field": "total_amount",
+        "value": {
+          "sum_by": [
+            { "lookup_many": ["order_lines", { "order": { "_eq": { "var": "id" } } }, ["id", "amount"], 500, { "__ctx": [] }] },
+            "amount",
+            {}
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "Décision multi-branches (case)",
+    "collection_cible": "orders",
+    "status": "active",
+    "priority": 40,
+    "trigger_event": ["update"],
+    "rule": { ">": [ { "var": "total" }, 0 ] },
+    "actions": [
+      { "type": "set_field", "field": "segment", "value": { "case": [ { ">": [ { "var": "total" }, 1000 ] }, "HIGH", { ">": [ { "var": "total" }, 100 ] }, "MEDIUM", "LOW" ] } }
+    ]
+  }
+  ,
+  {
+    "name": "Cascade date_fin → tâches (bulk)",
+    "collection_cible": "processus",
+    "status": "active",
+    "priority": 10,
+    "trigger_event": ["update"],
+    "rule": { "in": ["date_fin", { "var": "$CHANGED" }] },
+    "actions": [
+      {
+        "type": "update_many",
+        "collection": "taches",
+        "filter": { "processus_id": { "_eq": { "var": "id" } } },
+        "data": { "date_fin": { "var": "date_fin" } },
+        "assign": "bulk"
+      }
+    ]
+  },
+  {
+    "name": "Cascade calendrier → domaines (bulk avec when)",
+    "collection_cible": "calendriers",
+    "status": "active",
+    "priority": 10,
+    "trigger_event": ["update"],
+    "rule": { "in": ["date_fin", { "var": "$CHANGED" }] },
+    "actions": [
+      {
+        "type": "update_many",
+        "collection": "domaines",
+        "filter": { "calendrier_id": { "_eq": { "var": "id" } } },
+        "data": { "date_fin": { "var": "date_fin" } },
+        "when": { 
+          "or": [
+            { "in": ["date_fin", { "var": "$CHANGED" }] },
+            { "and": [ { ">": [ { "var": "date_fin" }, null ] }, { "!==": [ { "var": "date_fin" }, { "var": "$OLD.date_fin" } ] } ] }
+          ]
+        },
+        "assign": "bulk"
+      }
+    ]
+  }
+]

@@ -1,0 +1,256 @@
+<spawner>
+<!--ACI 29-10-2018 : Spawner : Dupliquer des campagnes -->
+
+<if><condition>and(campagne_dupliquer!=nulldocument(),campagne_dupliquer!=previousvalue("campagne_dupliquer"), dupliquer==:oui)</condition>
+	<then>
+
+
+<foreach var="curr_calendrier" in="campagne_dupliquer.calendriers_campagne">
+
+	
+<document-clone var="new_calendrier" source="$curr_calendrier">
+	<field name="ogp_project"><value>$curr_calendrier.ogp_project</value></field>
+	<field name="campagne_liee"><value>this()</value></field>
+    <field name="annee"><value>annee</value></field>
+	<field name="periode"><value>periode</value></field>
+	<field-clone name="norme_calendrier"></field-clone>
+	<field-clone name="opc_type_calendrier"></field-clone>
+	<field-clone name="type_calendrier"></field-clone>
+	<field-clone name="libelle_calendrier_dupli"></field-clone>
+	<field-clone name="opc_type_calendrier"></field-clone>
+	<field name="name"><value>if(or($curr_calendrier.type_calendrier!=:courant, $curr_calendrier.type_calendrier!=:decsi),concat(" ",annee, getenumlabel("periode", periode, "fr"), $curr_calendrier.libelle_calendrier_dupli),concat(" ",annee, $curr_calendrier.libelle_calendrier_dupli))</value></field>
+	<field-clone name="calendrier_test"></field-clone>
+	<field-clone name="nature_calendrier"></field-clone>
+
+</document-clone>
+
+		
+	<foreach var="curr_domaine" in="$curr_calendrier.liste_domaines">
+			<document-clone var="new_domaine" source="$curr_domaine">
+				<field name="ogp_project"><value>$curr_domaine.ogp_project</value></field>
+				<field name="calendrier_lie"><value>$new_calendrier</value></field>
+				<field-clone name="name"></field-clone>
+				<field-clone name="domaine_nom"></field-clone>
+				<field-clone name="macro_processus"></field-clone>	
+				<field-clone name="referent_domaine_d"></field-clone>	
+			</document-clone>	
+				
+			<foreach var="curr_processus" in="$curr_domaine.liste_processus">
+				<document-clone var="new_processus" source="$curr_processus">
+					<field name="ogp_project"><value>$curr_processus.ogp_project</value></field>
+					<field name="domaine_lie"><value>$new_domaine</value></field>
+					<field name="description_nom_processus"><value>if($curr_calendrier.type_calendrier!=:decsi,$curr_processus.description_nom_processus,concat(" ",description_process,annee))</value></field>
+					<field-clone name="name"></field-clone>
+				</document-clone>	
+		
+				<foreach var="curr_tache" in="$curr_processus.liste_taches">
+					<document-clone var="new_tache" source="$curr_tache">
+						<field name="ogp_project"><value>$curr_tache.ogp_project</value></field>
+						<field name="processus_lie"><value>$new_processus</value></field>
+						<field-clone name="processus_gantt"></field-clone>
+					
+						<field name="name"><value>
+						if($curr_calendrier.type_calendrier!=:courant,switch(periode==:t1,$curr_tache.dupli_libelle_t1,
+						periode==:t2,$curr_tache.dupli_libelle_t2,
+						periode==:t3,$curr_tache.dupli_libelle_t3,
+						periode==:t4,$curr_tache.dupli_libelle_t4,
+						$curr_tache.dupli_libelle_t4),$curr_tache.name)
+						</value></field>			
+						<field name="delai_date_reference"><value>
+						if($curr_calendrier.type_calendrier!=:courant,switch(periode==:t1,$curr_tache.dupli_j_t1,
+						periode==:t2,$curr_tache.dupli_j_t2,
+						periode==:t3,$curr_tache.dupli_j_t3,
+						periode==:t4,$curr_tache.dupli_j_t4,
+						$curr_tache.dupli_j_t4),$curr_tache.delai_date_reference)
+						</value></field>
+						<field name="dupli_activable"><value>
+						switch(periode==:t1,$curr_tache.dupli_activable_t1,
+						periode==:t2,$curr_tache.dupli_activable_t2,
+						periode==:t3,$curr_tache.dupli_activable_t3,
+						periode==:t4,$curr_tache.dupli_activable_t4,
+						$curr_tache.dupli_activable_t4)
+						</value></field>
+						<field name="fin_revise_tache"><value>if(or($curr_calendrier.type_calendrier!=:courant, $curr_calendrier.type_calendrier!=:decsi),nulldate(),dateadd($curr_tache.fin_revise_tache,1L,"year"))</value></field>
+						
+						<field name="date_reference_tache"><value>date_reference_calendrier</value></field>			
+						<field-clone name="charge_tache"></field-clone>
+						<field-clone name="classe_ctrl"></field-clone>
+						<field-clone name="clientele_ctrl"></field-clone>
+						<field-clone name="code_etat_reporting_s2_1"></field-clone>
+						<field-clone name="code_reportings"></field-clone>
+						<field-clone name="commentaire_impact"></field-clone>
+						<field-clone name="communication_aux_tiers_ctrl"></field-clone>
+						<field-clone name="ctrl_service_unite"></field-clone>
+						<field-clone name="ctrl_service_unite_2_d"></field-clone>
+						<field-clone name="delai_date_reference"></field-clone>
+						<field-clone name="description"></field-clone>
+						<field-clone name="diffusion_d"></field-clone>
+						<field-clone name="envoi_des_taches_2_jours"></field-clone>
+						<field-clone name="libelle_court"></field-clone>
+						<field-clone name="frequence_risque_brut_ctrl"></field-clone>
+						<field-clone name="frequence_risque_net_ctrl"></field-clone>
+						<field-clone name="frequence_tache"></field-clone>
+						<field-clone name="gantt"></field-clone>
+						<field-clone name="id"></field-clone>
+						<field-clone name="impact_risque_brut"></field-clone>
+						<field-clone name="impact_risque_net_ctrl"></field-clone>
+						<field-clone name="intitule_controle_ctrl"></field-clone>
+						<field-clone name="livrable_tache"></field-clone>
+						<field-clone name="macro_controle_ctrl"></field-clone>
+						<field-clone name="macro_processus_s2"></field-clone>
+						<field-clone name="marche_ctrl"></field-clone>
+						<field-clone name="modalites_supervision_ctrl"></field-clone>
+						<field-clone name="nature_ctrl"></field-clone>
+						<field-clone name="nature_tache"></field-clone>
+						<field-clone name="objectif_controle_ctrl"></field-clone>
+						<field-clone name="objectif_tache"></field-clone>
+						<field-clone name="periodicite_ctrl"></field-clone>
+						<field-clone name="priorite_controle_ctrl"></field-clone>
+						<field-clone name="provisoire_definitif_ctrl"></field-clone>
+						<field-clone name="reference_controle_gerico_ctrl"></field-clone>
+						<field-clone name="relance"></field-clone>
+						<field-clone name="responsable_g_d"></field-clone>
+						<field-clone name="risque_associe_uc_tache"></field-clone>
+						<field-clone name="risque_operationnel"></field-clone>
+						<field-clone name="si"></field-clone>
+						<field-clone name="sources_controle_ctrl"></field-clone>
+						<field-clone name="sous_macro_controle_ctrl"></field-clone>
+						<field-clone name="supervise_oui_non_ctrl"></field-clone>
+						<field-clone name="type_controle"></field-clone>
+						<field-clone name="type_tache"></field-clone>
+						<field-clone name="valideur_controle_d"></field-clone>
+						<field-clone name="fin_manuelle_controle"></field-clone>
+						<field-clone name="entite_juridique"></field-clone>
+						<field-clone name="map_interface_mise_jour"></field-clone>
+						<field-clone name="comment_pilotage_hist_tache"></field-clone>
+						<field-clone name="membre_pilotage_d"></field-clone>
+						<field-clone name="jalon_metier"></field-clone>
+						<field-clone name="bloc_multimedia_tache"></field-clone>
+						<field-clone name="bloc_multimedia_doc_tache"></field-clone>
+						<field-clone name="positionnement_date"></field-clone>
+						<field-clone name="libelle_metier"></field-clone>
+						<field-clone name="regroupement_metier"></field-clone>
+						<field-clone name="mode_calcul_des_jours"></field-clone>
+						<field-clone name="type_livrable_s2"></field-clone>
+						<field-clone name="norme_tache"></field-clone>
+						<field-clone name="zoom"></field-clone>
+						<field-clone name="remontee_siege"></field-clone>
+                        <field-clone name="tache_suivi_filiales"></field-clone> 
+						<field-clone name="periode_calendrier"></field-clone> 
+
+						
+						<!--<field-clone name="prerequis_d_d"></field-clone>
+						 -->
+
+						<field-clone name="dupli_libelle_t1"></field-clone>
+						<field-clone name="dupli_libelle_t2"></field-clone>
+						<field-clone name="dupli_libelle_t3"></field-clone>
+						<field-clone name="dupli_libelle_t4"></field-clone>
+						<field-clone name="dupli_j_t1"></field-clone>
+						<field-clone name="dupli_j_t2"></field-clone>
+						<field-clone name="dupli_j_t3"></field-clone>
+						<field-clone name="dupli_j_t4"></field-clone>
+						<field-clone name="dupli_activable_t1"></field-clone>
+						<field-clone name="dupli_activable_t2"></field-clone>
+						<field-clone name="dupli_activable_t3"></field-clone>
+						<field-clone name="dupli_activable_t4"></field-clone>				
+						<field-clone name="info_duplication_t1"></field-clone>
+						<field-clone name="info_duplication_t2"></field-clone>
+						<field-clone name="info_duplication_t3"></field-clone>
+						<field-clone name="info_duplication_t4"></field-clone>
+						
+						<!--ACI 11072023 Ajout champs dans la duplucation-->
+						<field name="tache_revue_duplication"><value>
+						switch($curr_tache.tache_revue_duplication==:attente_validation,:attente_validation_1,
+						$curr_tache.tache_revue_duplication==:revue,:revue_1,
+						:non_revue)
+						</value></field>
+						<field-clone name="commentaire_revue_avant_d_1"></field-clone>
+						</document-clone>
+
+						<foreach var="curr_checklist" in="$curr_tache.liste_checklists"> <!--ACI 01/05/2019 : Spawner : ajout des checklists -->
+							<document-clone var="new_checklist" source="$curr_checklist">
+								<field name="ogp_project"><value>$curr_checklist.ogp_project</value></field>		
+								<field name="tache_lie"><value>$new_tache</value></field>
+								<field-clone name="name"></field-clone>
+								<field-clone name="description"></field-clone>
+								<field-clone name="responsable_g_d"></field-clone>
+								<field-clone name="delai_checklist"></field-clone>
+							</document-clone>
+						</foreach>		
+				</foreach>
+			</foreach>
+	</foreach>
+</foreach>
+<document-update uri="this()">
+	<field name="dupliquer"><value>:termine</value></field>
+</document-update>
+
+		
+
+	</then>
+	<else>
+	</else>
+
+</if>
+
+
+
+
+<!--ACI 06-04-2020 : Spawner : Dupliquer le kit Macro Processus -->
+
+<if><condition>and( count(kit_dupliquer_d) > 0L , dupliquer_mp==:oui)</condition>
+<then>
+
+<foreach var="curr_kit" in="kit_dupliquer_d">
+    <document-create var="new_chantier" document-class="cnp_etapes">		
+		<field name="ogp_project"><value>getdocument("/ogpProject/2894659")</value></field>
+		<field name="name">			<value>concat(" ", "Activités MP", getenumlabel("periode", periode, "fr"), annee)</value></field>
+	</document-create>
+
+
+<foreach var="curr_macro_process" in="$curr_kit.liste_macro_process">
+
+            <document-create var="new_ss_chantier" document-class="cnp_sous_chantier">		
+			    <field name="ogp_project"><value>getdocument("/ogpProject/2894659")</value></field>
+				<field name="name"><value>concat(" ", getenumlabel("periode", periode, "fr"), annee , $curr_macro_process.name)</value></field>
+				<field name="cnp_sschant_chantier">	<value>$new_chantier</value></field>
+				<field name="cnp_sschant_type">	<value>:macro_processus</value></field>
+				<field name="membres_timesheet_sch">	<value>$curr_macro_process.membres_timesheet_mp</value></field>
+				<field name="date_debut_sch">	<value>$curr_macro_process.date_debut_mp</value></field>
+				<field name="date_fin_sch">	<value>$curr_macro_process.date_fin_mp</value></field>
+				<field name="type_activites"><value>
+				
+		     switch($curr_macro_process.type_activites==:na,:na,
+			  $curr_macro_process.type_activites==:courant, :courant,
+			  $curr_macro_process.type_activites==:inventaire , :inventaire)</value></field>
+			</document-create>	
+			
+<foreach var="curr_activite" in="$curr_macro_process.liste_activites">
+
+			<document-clone var="new_activite" source="$curr_activite">
+			    <field name="ogp_project"><value>getdocument("/ogpProject/2894659")</value></field>
+				<field name="etapes_lie"><value>$new_ss_chantier</value></field>
+				<field name="synchronisation_arm"><value>:oui</value></field>
+				<field-clone name="name"></field-clone>
+				<field-clone name="activ_id"></field-clone>
+				<field-clone name="activ_input"></field-clone>
+				<field-clone name="activ_output"></field-clone>
+				<field-clone name="activ_phase"></field-clone>
+				<field-clone name="activ_periode_concernee"></field-clone>
+				<field-clone name="activ_service"></field-clone>
+				<field-clone name="activ_type"></field-clone>
+			</document-clone>
+			
+</foreach>					
+</foreach>
+</foreach>
+
+<document-update uri="this()">
+	<field name="dupliquer_mp"><value>:termine</value></field>
+</document-update>
+	</then>
+	<else>
+	</else>
+</if>
+</spawner>

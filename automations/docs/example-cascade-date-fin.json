@@ -1,0 +1,145 @@
+[
+  {
+    "name": "Cascade date_fin: Campagne → Calendriers",
+    "collection_cible": "campagnes",
+    "trigger_event": ["update"],
+    "status": "active",
+    "priority": 10,
+    "description": "Quand date_fin de campagne change, cascade vers tous les calendriers liés",
+    "rule_jsonb": {
+      "in": ["date_fin", { "var": "$CHANGED" }]
+    },
+    "actions_jsonb": [
+      {
+        "type": "for_each",
+        "list": { 
+          "lookup_many": [
+            "calendriers", 
+            { "campagne_id": { "_eq": { "var": "id" } } }, 
+            ["id"], 
+            500, 
+            { "__ctx": [] }
+          ] 
+        },
+        "actions": [
+          {
+            "type": "update_item",
+            "collection": "calendriers",
+            "id": { "var": "$item.id" },
+            "data": {
+              "date_fin": { "var": "date_fin" }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Cascade date_fin: Calendrier → Domaines",
+    "collection_cible": "calendriers",
+    "trigger_event": ["update"],
+    "status": "active",
+    "priority": 10,
+    "description": "Quand date_fin de calendrier change, cascade vers tous les domaines liés",
+    "rule_jsonb": {
+      "and": [
+        { "in": ["date_fin", { "var": "$CHANGED" }] },
+        { "!==": [{ "var": "$USER._automationTriggered" }, true] }
+      ]
+    },
+    "actions_jsonb": [
+      {
+        "type": "for_each",
+        "list": { 
+          "lookup_many": [
+            "domaines", 
+            { "calendrier_id": { "_eq": { "var": "id" } } }, 
+            ["id"], 
+            500, 
+            { "__ctx": [] }
+          ] 
+        },
+        "actions": [
+          {
+            "type": "update_item",
+            "collection": "domaines",
+            "id": { "var": "$item.id" },
+            "data": {
+              "date_fin": { "var": "date_fin" }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Cascade date_fin: Domaine → Processus",
+    "collection_cible": "domaines",
+    "trigger_event": ["update"],
+    "status": "active",
+    "priority": 10,
+    "description": "Quand date_fin de domaine change, cascade vers tous les processus liés",
+    "rule_jsonb": {
+      "in": ["date_fin", { "var": "$CHANGED" }]
+    },
+    "actions_jsonb": [
+      {
+        "type": "for_each",
+        "list": { 
+          "lookup_many": [
+            "processus", 
+            { "domaine_id": { "_eq": { "var": "id" } } }, 
+            ["id"], 
+            500, 
+            { "__ctx": [] }
+          ] 
+        },
+        "actions": [
+          {
+            "type": "update_item",
+            "collection": "processus",
+            "id": { "var": "$item.id" },
+            "data": {
+              "date_fin": { "var": "date_fin" }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Cascade date_fin: Processus → Tâches",
+    "collection_cible": "processus",
+    "trigger_event": ["update"],
+    "status": "active",
+    "priority": 10,
+    "description": "Quand date_fin de processus change, cascade vers toutes les tâches liées",
+    "rule_jsonb": {
+      "in": ["date_fin", { "var": "$CHANGED" }]
+    },
+    "actions_jsonb": [
+      {
+        "type": "for_each",
+        "list": { 
+          "lookup_many": [
+            "taches", 
+            { "processus_id": { "_eq": { "var": "id" } } }, 
+            ["id"], 
+            500, 
+            { "__ctx": [] }
+          ] 
+        },
+        "actions": [
+          {
+            "type": "update_item",
+            "collection": "taches",
+            "id": { "var": "$item.id" },
+            "data": {
+              "date_fin": { "var": "date_fin" }
+            }
+          }
+        ]
+      }
+    ]
+  }
+]

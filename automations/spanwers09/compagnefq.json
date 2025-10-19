@@ -1,0 +1,78 @@
+{
+  "name": "Dupliquer campagne",
+  "collection_cible": "campagnes",
+  "status": "active",
+  "expand_fields": ["campagne_dupliquer.calendriers_campagne.liste_domaines.liste_processus.liste_taches.liste_checklists"],
+  "rule": {
+    "and": [
+      { "!==": [ { "var": "campagne_dupliquer" }, null ] },
+      { "in": [ "campagne_dupliquer", { "var": "$CHANGED" } ] },
+      { "===": [ { "var": "dupliquer" }, "oui" ] }
+    ]
+  },
+  "actions": [
+    {
+      "type": "for_each",
+      "list": { "var": "campagne_dupliquer.calendriers_campagne" },
+      "actions": [
+        {
+          "type": "create_item",
+          "collection": "calendriers",
+          "assign": "new_calendrier",
+          "data": {
+            "campagne_liee": { "var": "id" },
+            "annee": { "var": "annee" },
+            "periode": { "var": "periode" },
+            "name": {
+              "iif": [
+                { "or": [ { "!==": [ { "var": "$item.type_calendrier" }, "courant" ] }, { "!==": [ { "var": "$item.type_calendrier" }, "decsi" ] } ] },
+                { "concat": [ " ", { "var": "annee" }, " periode-label ", { "var": "$item.libelle_calendrier_dupli" } ] },
+                { "concat": [ " ", { "var": "annee" }, " ", { "var": "$item.libelle_calendrier_dupli" } ] }
+              ]
+            }
+       
+          }
+        },
+        {
+          "type": "for_each",
+          "list": { "var": "$item.liste_domaines" },
+          "actions": [
+            { "type": "create_item", "collection": "domaines", "assign": "new_domaine", "data": { "calendrier_lie": { "var": "$new_calendrier.id" }, "name": { "var": "$item.name" } } },
+            {
+              "type": "for_each",
+              "list": { "var": "$item.liste_processus" },
+              "actions": [
+                { "type": "create_item", "collection": "processus", "assign": "new_processus", "data": { "domaine_lie": { "var": "$new_domaine.id" }, "name": { "var": "$item.name" } } },
+                {
+                  "type": "for_each",
+                  "list": { "var": "$item.liste_taches" },
+                  "actions": [
+                    {
+                      "type": "create_item",
+                      "collection": "taches",
+                      "assign": "new_tache",
+                      "data": {
+                        "processus_lie": { "var": "$new_processus.id" },
+                        "name": { "case": [ { "!==": [ { "var": "$item.type_calendrier" }, "courant" ] }, { "case": [ { "===": [ { "var": "periode" }, "t1" ] }, { "var": "$item.dupli_libelle_t1" }, { "===": [ { "var": "periode" }, "t2" ] }, { "var": "$item.dupli_libelle_t2" }, { "var": "$item.dupli_libelle_t4" } ] }, { "var": "$item.name" } ] },
+                        "delai_date_reference": { "case": [ ] },
+                        "fin_revise_tache": { "iif": [ { "or": [ ] }, null, { "date_add": [ { "var": "$item.fin_revise_tache" }, 365, "days" ] } ] }
+                      }
+                    },
+                    {
+                      "type": "for_each",
+                      "list": { "var": "$item.liste_checklists" },
+                      "actions": [
+                        { "type": "create_item", "collection": "checklists", "data": { "tache_lie": { "var": "$new_tache.id" }, "name": { "var": "$item.name" } } }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    { "type": "set_field", "field": "dupliquer", "value": "termine" }
+  ]
+}

@@ -1,0 +1,70 @@
+[
+  {
+    "name": "Cascade campagne → calendriers (bulk)",
+    "collection_cible": "campagnes",
+    "status": "active",
+    "priority": 10,
+    "trigger_event": ["update"],
+    "rule": { "in": ["date_fin", { "var": "$CHANGED" }] },
+    "actions": [
+      {
+        "type": "update_many",
+        "collection": "calendriers",
+        "filter": { "campagne_id": { "_eq": { "var": "id" } } },
+        "data": { "date_fin": { "var": "date_fin" } },
+        "assign": "bulk_cal"
+      }
+    ]
+  },
+  {
+    "name": "Cascade calendrier → domaines (bulk)",
+    "collection_cible": "calendriers",
+    "status": "active",
+    "priority": 10,
+    "trigger_event": ["update"],
+    "rule": { "in": ["date_fin", { "var": "$CHANGED" }] },
+    "actions": [
+      {
+        "type": "update_many",
+        "collection": "domaines",
+        "filter": { "calendrier_id": { "_eq": { "var": "id" } } },
+        "data": { "date_fin": { "var": "date_fin" } },
+        "assign": "bulk_dom"
+      }
+    ]
+  },
+  {
+    "name": "Cascade domaine → processus (bulk)",
+    "collection_cible": "domaines",
+    "status": "active",
+    "priority": 10,
+    "trigger_event": ["update"],
+    "rule": { "in": ["date_fin", { "var": "$CHANGED" }] },
+    "actions": [
+      {
+        "type": "update_many",
+        "collection": "processus",
+        "filter": { "domaine_id": { "_eq": { "var": "id" } } },
+        "data": { "date_fin": { "var": "date_fin" } },
+        "assign": "bulk_proc"
+      }
+    ]
+  },
+  {
+    "name": "Cascade processus → tâches (bulk)",
+    "collection_cible": "processus",
+    "status": "active",
+    "priority": 10,
+    "trigger_event": ["update"],
+    "rule": { "in": ["date_fin", { "var": "$CHANGED" }] },
+    "actions": [
+      {
+        "type": "update_many",
+        "collection": "taches",
+        "filter": { "processus_id": { "_eq": { "var": "id" } } },
+        "data": { "date_fin": { "var": "date_fin" } },
+        "assign": "bulk_task"
+      }
+    ]
+  }
+]

@@ -15,8 +15,8 @@
     "type": "bundle",
     "host": "^11.0.0",
     "path": {
-      "app": "dist/app.js",
-      "api": "dist/api.js"
+      "app": "dist/index.js",
+      "api": "dist/index.js"
     },
     "entries": [
       {

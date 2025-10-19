@@ -191,4 +191,212 @@ export default (router, { services, database, logger, emitter, getSchema }) => {
       res.status(500).json({ success: false, error: error.message });
     }
   });
+
+  // ============================================================================
+  // UTILITY ROUTES
+  // ============================================================================
+
+  // POST /realtime-calc/clear-cache - Clear formula cache
+  router.post('/clear-cache', async (req, res) => {
+    try {
+      logger.info('[RealTime-Calc Endpoint] Clearing formula cache...');
+      
+      // Trigger cache clear via event system
+      const result = await emitter.emitAction('realtime-calc.clear-cache', {});
+      
+      res.json({
+        success: true,
+        message: 'Formula cache cleared',
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('[RealTime-Calc Endpoint] Error clearing cache:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // POST /realtime-calc/test-formula - Test a formula with sample data
+  router.post('/test-formula', async (req, res) => {
+    try {
+      const { formula, sampleData = {} } = req.body;
+      
+      if (!formula) {
+        return res.status(400).json({
+          success: false,
+          error: 'Formula is required'
+        });
+      }
+      
+      logger.info(`[RealTime-Calc Endpoint] Testing formula: ${formula}`);
+      
+      // Use DSLEvaluator to validate and evaluate
+      const dslEvaluator = new DSLEvaluator(logger);
+      
+      try {
+        const result = dslEvaluator.evaluate(formula, sampleData);
+        const fields = dslEvaluator.extractFields(formula);
+        
+        // Check if formula is local (no relational operations)
+        const relationalOps = ['LOOKUP', 'PARENT', 'CHILDREN', 'RELATED', 'SUM', 'AVG', 'COUNT', 'MIN', 'MAX', 'COUNT_DISTINCT'];
+        const isLocal = !relationalOps.some(op => {
+          const pattern = new RegExp(`\\b${op}\\s*\\(`, 'i');
+          return pattern.test(formula);
+        });
+        
+        res.json({
+          valid: true,
+          result,
+          fields,
+          isLocal,
+          message: isLocal 
+            ? `Formula is valid (local). Result: ${result}`
+            : `Formula is valid but uses relational operations. Result: ${result}`
+        });
+      } catch (evalError) {
+        res.json({
+          valid: false,
+          error: evalError.message,
+          message: `Formula error: ${evalError.message}`
+        });
+      }
+    } catch (error) {
+      logger.error('[RealTime-Calc Endpoint] Error in test-formula:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // POST /realtime-calc/calculate - Calculate fields without DB write
+  router.post('/calculate', async (req, res) => {
+    try {
+      const { collection, data, fields = null } = req.body;
+      
+      if (!collection || !data) {
+        return res.status(400).json({
+          success: false,
+          error: 'Collection and data are required'
+        });
+      }
+      
+      logger.info(`[RealTime-Calc Endpoint] Calculating fields for collection: ${collection}`);
+      
+      // Load formulas and build dependencies
+      const formulaLoader = new FormulaLoader(database, logger);
+      const dependencyGraph = new DependencyGraph(logger);
+      const dslEvaluator = new DSLEvaluator(logger);
+      
+      const formulaConfigs = await formulaLoader.loadLocalFormulas();
+      const config = formulaConfigs[collection];
+      
+      if (!config || Object.keys(config).length === 0) {
+        return res.json({
+          success: true,
+          updates: {},
+          message: `No formulas for collection ${collection}`
+        });
+      }
+      
+      // Build dependency graph and get calculation order
+      const analysis = dependencyGraph.analyze(config);
+      let calculationOrder = analysis?.order || Object.keys(config);
+      
+      // Filter by requested fields if specified
+      if (Array.isArray(fields) && fields.length > 0) {
+        const targetSet = dependencyGraph.collectDependencyClosure(
+          analysis?.graph,
+          fields
+        );
+        calculationOrder = calculationOrder.filter(field => targetSet.has(field));
+      }
+      
+      // Calculate fields with propagation
+      const updates = {};
+      const workingData = { ...data };
+      
+      for (const fieldName of calculationOrder) {
+        const formulaConfig = config[fieldName];
+        try {
+          const context = { ...workingData, ...updates };
+          const newValue = dslEvaluator.evaluate(formulaConfig.formula, context);
+          updates[fieldName] = newValue;
+          workingData[fieldName] = newValue;
+        } catch (error) {
+          logger.error(`[RealTime-Calc Endpoint] Error calculating ${collection}.${fieldName}:`, error.message);
+          updates[fieldName] = null;
+        }
+      }
+      
+      res.json({
+        success: true,
+        updates,
+        message: `Calculated ${Object.keys(updates).length} field(s)`
+      });
+    } catch (error) {
+      logger.error('[RealTime-Calc Endpoint] Error calculating fields:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // GET /realtime-calc - Documentation endpoint
+  router.get('/', (req, res) => {
+    res.json({
+      success: true,
+      message: 'Directus Real-Time Calculator',
+      version: '1.0.0',
+      endpoints: {
+        'GET /': 'This help message',
+        'GET /status': 'Get system status and formula count',
+        'POST /reload': 'Reload formulas from database',
+        'POST /test-formula': 'Test a formula with sample data',
+        'POST /calculate': 'Calculate fields without DB write (preview)',
+        'POST /clear-cache': 'Clear formula cache',
+        'POST /utils/realtime-calc.reload-formulas': 'Reload formulas (Flow-compatible)',
+        'POST /utils/realtime-calc.get-config': 'Get configuration (Flow-compatible)',
+        'POST /utils/realtime-calc.recalculate-collection': 'Batch recalculate collection'
+      },
+      examples: {
+        testFormula: {
+          endpoint: 'POST /realtime-calc/test-formula',
+          body: {
+            formula: '{{prix_ht}} * (1 + {{tva_rate}})',
+            sampleData: { prix_ht: 100, tva_rate: 0.2 }
+          },
+          description: 'Test a formula before saving it'
+        },
+        calculate: {
+          endpoint: 'POST /realtime-calc/calculate',
+          body: {
+            collection: 'products',
+            data: { prix_ht: 100, tva_rate: 0.2 },
+            fields: ['prix_ttc']
+          },
+          description: 'Preview calculated values without saving'
+        },
+        recalculate: {
+          endpoint: 'POST /realtime-calc/utils/realtime-calc.recalculate-collection',
+          body: {
+            collection: 'products',
+            filter: { status: { _eq: 'published' } },
+            batchSize: 100,
+            dryRun: true
+          },
+          description: 'Batch recalculate items in a collection'
+        },
+        clearCache: {
+          endpoint: 'POST /realtime-calc/clear-cache',
+          body: {},
+          description: 'Clear formula cache manually'
+        }
+      },
+      note: 'Real-time calculation with 60+ DSL functions including math, string, date, and conditional operations'
+    });
+  });
 };

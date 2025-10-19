@@ -586,6 +586,37 @@ export default ({ filter, action }, { services, exceptions, logger, database, ge
     };
   });
 
+  /**
+   * Action pour vider le cache des formules compilées
+   */
+  action('realtime-calc.clear-cache', async () => {
+    try {
+      logger.info('[RealTime-Calc] 🗑️ Clearing formula cache...');
+      
+      // Clear DSLEvaluator cache
+      dslEvaluator.clearCache();
+      
+      // Clear FormulaLoader cache if it has one
+      if (formulaLoader && typeof formulaLoader.clearCache === 'function') {
+        formulaLoader.clearCache();
+      }
+      
+      logger.info('[RealTime-Calc] ✅ Formula cache cleared successfully');
+      
+      return {
+        success: true,
+        message: 'Formula cache cleared'
+      };
+    } catch (error) {
+      logger.error('[RealTime-Calc] ❌ Failed to clear cache:', error);
+      return {
+        success: false,
+        error: error.message,
+        message: `Failed to clear cache: ${error.message}`
+      };
+    }
+  });
+
   // Initialisation au démarrage
   initializationPromise = (async () => {
     const success = await loadFormulasAndBuildGraphs();

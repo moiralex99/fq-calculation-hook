@@ -12,6 +12,16 @@
         v-if="!loadingConfig && !configError"
         rounded
         icon
+        @click="clearCache"
+        v-tooltip="'Vider le cache'"
+        :loading="clearingCache"
+      >
+        <v-icon name="delete_sweep" />
+      </v-button>
+      <v-button
+        v-if="!loadingConfig && !configError"
+        rounded
+        icon
         @click="loadFormulas"
         v-tooltip="'Recharger'"
       >
@@ -98,6 +108,86 @@
             <span v-if="selectedFields.length">{{ selectedFields.length }} champ(s) sélectionné(s)</span>
           </div>
         </div>
+
+        <!-- Formula Tester - Collapsible -->
+        <details class="formula-tester-card">
+          <summary class="formula-tester-header">
+            <v-icon name="science" small />
+            <span>Testeur de Formule</span>
+            <span class="formula-tester-badge">Nouveau</span>
+          </summary>
+          <div class="formula-tester-body">
+            <div class="form-group">
+              <label class="form-label">Formule à tester</label>
+              <v-textarea
+                v-model="testFormula"
+                placeholder='Exemple: {{prix_ht}} * (1 + {{tva_rate}})'
+                rows="2"
+                font-family="monospace"
+              />
+              <span class="form-hint">Utilisez la syntaxe DSL avec {{champ}}</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Données de test (JSON)</label>
+              <v-textarea
+                v-model="testSampleData"
+                placeholder='{"prix_ht": 100, "tva_rate": 0.2}'
+                rows="3"
+                font-family="monospace"
+              />
+              <span class="form-hint">Fournissez les valeurs pour chaque champ utilisé dans la formule</span>
+              <span v-if="testFormulaError" class="form-error">{{ testFormulaError }}</span>
+            </div>
+
+            <div class="form-actions">
+              <v-button
+                @click="runTestFormula"
+                :loading="testingFormula"
+                :disabled="!testFormula.trim()"
+              >
+                <v-icon name="play_arrow" left />
+                Tester
+              </v-button>
+              <v-button
+                @click="resetTestFormula"
+                :disabled="testingFormula"
+                secondary
+              >
+                Réinitialiser
+              </v-button>
+            </div>
+
+            <!-- Test Result -->
+            <div v-if="testFormulaResult" class="test-result-card" :class="testFormulaResult.valid ? 'test-result-success' : 'test-result-error'">
+              <div class="test-result-header">
+                <v-icon :name="testFormulaResult.valid ? 'check_circle' : 'error'" />
+                <span class="test-result-title">
+                  {{ testFormulaResult.valid ? 'Formule valide' : 'Formule invalide' }}
+                </span>
+              </div>
+              <div v-if="testFormulaResult.valid" class="test-result-details">
+                <div class="test-result-row">
+                  <span class="test-result-label">Résultat :</span>
+                  <span class="test-result-value">{{ testFormulaResult.result }}</span>
+                </div>
+                <div class="test-result-row" v-if="testFormulaResult.fields && testFormulaResult.fields.length">
+                  <span class="test-result-label">Dépendances :</span>
+                  <span class="test-result-value">{{ testFormulaResult.fields.join(', ') }}</span>
+                </div>
+                <div class="test-result-row">
+                  <span class="test-result-label">Type :</span>
+                  <span class="test-result-badge" :class="testFormulaResult.isLocal ? 'badge-local' : 'badge-relational'">
+                    {{ testFormulaResult.isLocal ? 'Locale' : 'Relationnelle' }}
+                  </span>
+                </div>
+              </div>
+              <div v-else class="test-result-error-msg">
+                {{ testFormulaResult.error }}
+              </div>
+            </div>
+          </div>
+        </details>
 
         <!-- Main Content Grid -->
         <div class="content-grid">
@@ -250,8 +340,18 @@
                   Lancer la recalculation
                 </v-button>
                 <v-button
+                  :loading="previewing"
+                  :disabled="!selectedCollection || running"
+                  @click="runPreview"
+                  secondary
+                  large
+                >
+                  <v-icon name="visibility" left />
+                  Aperçu (1 item)
+                </v-button>
+                <v-button
                   @click="resetForm"
-                  :disabled="running"
+                  :disabled="running || previewing"
                   secondary
                 >
                   Réinitialiser
@@ -365,6 +465,19 @@ const batchSize = ref(100);
 const dryRun = ref(false);
 const running = ref(false);
 const result = ref(null);
+
+// Preview state
+const previewing = ref(false);
+
+// Formula tester state
+const testFormula = ref('');
+const testSampleData = ref('{}');
+const testingFormula = ref(false);
+const testFormulaResult = ref(null);
+const testFormulaError = ref(null);
+
+// Clear cache state
+const clearingCache = ref(false);
 
 // Grouper les formules par collection
 const formulasByCollection = computed(() => {
@@ -530,6 +643,88 @@ async function loadFormulas() {
   }
 }
 
+async function clearCache() {
+  clearingCache.value = true;
+  try {
+    await api.post('/realtime-calc/clear-cache');
+    notify({
+      title: 'Cache vidé',
+      message: 'Le cache des formules a été vidé avec succès',
+      type: 'success',
+    });
+  } catch (error) {
+    const message = error?.response?.data?.error || error?.message || String(error);
+    notify({
+      title: 'Erreur',
+      message: `Impossible de vider le cache: ${message}`,
+      type: 'error',
+    });
+  } finally {
+    clearingCache.value = false;
+  }
+}
+
+async function runTestFormula() {
+  if (!testFormula.value.trim()) {
+    return;
+  }
+
+  testingFormula.value = true;
+  testFormulaResult.value = null;
+  testFormulaError.value = null;
+
+  try {
+    let sampleData = {};
+    if (testSampleData.value && testSampleData.value.trim()) {
+      try {
+        sampleData = JSON.parse(testSampleData.value);
+      } catch (error) {
+        testFormulaError.value = `JSON invalide: ${error.message}`;
+        testingFormula.value = false;
+        return;
+      }
+    }
+
+    const { data } = await api.post('/realtime-calc/test-formula', {
+      formula: testFormula.value,
+      sampleData
+    });
+
+    testFormulaResult.value = data;
+
+    if (data.valid) {
+      notify({
+        title: 'Formule valide',
+        message: `Résultat: ${data.result}`,
+        type: 'success',
+      });
+    } else {
+      notify({
+        title: 'Formule invalide',
+        message: data.error,
+        type: 'error',
+      });
+    }
+  } catch (error) {
+    const message = error?.response?.data?.error || error?.message || String(error);
+    testFormulaError.value = message;
+    notify({
+      title: 'Erreur test',
+      message,
+      type: 'error',
+    });
+  } finally {
+    testingFormula.value = false;
+  }
+}
+
+function resetTestFormula() {
+  testFormula.value = '';
+  testSampleData.value = '{}';
+  testFormulaResult.value = null;
+  testFormulaError.value = null;
+}
+
 onMounted(loadFormulas);
 
 function parseFilterInput() {
@@ -562,6 +757,105 @@ function parseFilterInput() {
   }
 
   return userFilter;
+}
+
+async function runPreview() {
+  if (!selectedCollection.value) {
+    notify({
+      title: 'Collection manquante',
+      message: 'Choisis une collection à prévisualiser.',
+      type: 'warning',
+    });
+    return;
+  }
+
+  previewing.value = true;
+  filterError.value = null;
+
+  try {
+    let filter = null;
+    try {
+      filter = parseFilterInput();
+    } catch (error) {
+      notify({
+        title: 'Filtre invalide',
+        message: "Ton filtre JSON n'est pas valide.",
+        type: 'error',
+      });
+      previewing.value = false;
+      return;
+    }
+
+    // Fetch 1 item from collection
+    const fetchParams = {
+      limit: 1,
+      fields: ['*']
+    };
+    if (filter) {
+      fetchParams.filter = filter;
+    }
+
+    const { data: itemsData } = await api.get(`/items/${selectedCollection.value}`, { params: fetchParams });
+    const items = itemsData?.data || [];
+
+    if (items.length === 0) {
+      notify({
+        title: 'Aucun item',
+        message: 'Aucun item trouvé avec le filtre actuel.',
+        type: 'warning',
+      });
+      previewing.value = false;
+      return;
+    }
+
+    const item = items[0];
+
+    // Calculate preview using /calculate endpoint
+    const fields = selectedFields.value.length > 0 ? selectedFields.value : null;
+    const { data: calcData } = await api.post('/realtime-calc/calculate', {
+      collection: selectedCollection.value,
+      data: item,
+      fields
+    });
+
+    if (calcData.success) {
+      // Show preview result
+      result.value = {
+        success: true,
+        collection: selectedCollection.value,
+        processed: 1,
+        updated: Object.keys(calcData.updates).length > 0 ? 1 : 0,
+        total: 1,
+        dryRun: true,
+        updatedItems: [{
+          id: item.id,
+          updates: calcData.updates
+        }],
+        message: `Aperçu: ${Object.keys(calcData.updates).length} champ(s) seraient modifiés`
+      };
+
+      notify({
+        title: 'Aperçu généré',
+        message: `${Object.keys(calcData.updates).length} champ(s) seraient modifiés`,
+        type: 'success',
+      });
+    } else {
+      notify({
+        title: 'Erreur aperçu',
+        message: calcData.error || 'Erreur lors du calcul',
+        type: 'error',
+      });
+    }
+  } catch (error) {
+    const message = error?.response?.data?.error || error?.message || String(error);
+    notify({
+      title: 'Erreur aperçu',
+      message,
+      type: 'error',
+    });
+  } finally {
+    previewing.value = false;
+  }
 }
 
 async function runRecalculate() {
@@ -1146,5 +1440,136 @@ async function runRecalculate() {
   color: var(--theme--foreground-subdued);
   font-size: 0.65rem;
   font-family: var(--theme--font-monospace);
+}
+
+/* Formula Tester - Collapsible */
+.formula-tester-card {
+  background: var(--theme--background);
+  border: 1px solid var(--theme--border-color);
+  border-radius: var(--theme--border-radius);
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+}
+
+.formula-tester-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: linear-gradient(to right, var(--theme--primary-subdued, rgba(80, 86, 231, 0.1)) 0%, var(--theme--background) 100%);
+  border-left: 3px solid var(--theme--primary);
+  cursor: pointer;
+  user-select: none;
+  font-weight: 600;
+  color: var(--theme--foreground);
+  font-size: 0.85rem;
+  transition: background 0.15s;
+}
+
+.formula-tester-header:hover {
+  background: linear-gradient(to right, var(--theme--primary-subdued, rgba(80, 86, 231, 0.15)) 0%, var(--theme--background-accent) 100%);
+}
+
+.formula-tester-badge {
+  margin-left: auto;
+  font-size: 0.65rem;
+  background: var(--theme--primary);
+  color: white;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.formula-tester-body {
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border-top: 1px solid var(--theme--border-color-subdued);
+}
+
+/* Test Result Card */
+.test-result-card {
+  border: 2px solid;
+  border-radius: var(--theme--border-radius);
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.test-result-success {
+  border-color: #4caf50;
+  background: linear-gradient(to right, #e8f5e9 0%, var(--theme--background) 100%);
+}
+
+.test-result-error {
+  border-color: #f44336;
+  background: linear-gradient(to right, #ffebee 0%, var(--theme--background) 100%);
+}
+
+.test-result-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.test-result-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--theme--foreground);
+}
+
+.test-result-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+}
+
+.test-result-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.test-result-label {
+  font-weight: 600;
+  color: var(--theme--foreground-subdued);
+  min-width: 100px;
+}
+
+.test-result-value {
+  color: var(--theme--foreground);
+  font-family: var(--theme--font-monospace);
+}
+
+.test-result-badge {
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.test-result-badge.badge-local {
+  background: #4caf50;
+  color: white;
+}
+
+.test-result-badge.badge-relational {
+  background: #ff9800;
+  color: white;
+}
+
+.test-result-error-msg {
+  color: var(--theme--danger);
+  font-size: 0.75rem;
+  font-family: var(--theme--font-monospace);
+  background: var(--theme--background);
+  padding: 0.5rem;
+  border-radius: var(--theme--border-radius);
+  border: 1px solid var(--theme--danger);
 }
 </style>

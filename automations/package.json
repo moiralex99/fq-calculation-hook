@@ -5,11 +5,23 @@
   "type": "module",
   "directus:extension": {
     "type": "bundle",
+    "host": "^11.0.0",
+    "path": {
+      "app": "dist/index.js",
+      "api": "dist/index.js"
+    },
     "entries": [
-      { "type": "hook", "path": "dist/index.js", "source": "src/index.js" },
-      { "type": "endpoint", "path": "dist/endpoint.js", "source": "src/endpoint.js" }
-    ],
-    "host": "^11.0.0"
+      {
+        "type": "hook",
+        "name": "quartz-automations-hook",
+        "source": "src/index.js"
+      },
+      {
+        "type": "endpoint",
+        "name": "quartz-automations",
+        "source": "src/endpoint.js"
+      }
+    ]
   },
   "scripts": {
     "build": "directus-extension build",

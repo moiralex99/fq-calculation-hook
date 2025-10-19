@@ -4,9 +4,11 @@
   "description": "Automatisations simples pour Directus (JSONLogic triggers + actions set_field)",
   "type": "module",
   "directus:extension": {
-    "type": "hook",
-    "path": "dist/index.js",
-    "source": "src/index.js",
+    "type": "bundle",
+    "entries": [
+      { "type": "hook", "path": "dist/index.js", "source": "src/index.js" },
+      { "type": "endpoint", "path": "dist/endpoint.js", "source": "src/endpoint.js" }
+    ],
     "host": "^11.0.0"
   },
   "scripts": {

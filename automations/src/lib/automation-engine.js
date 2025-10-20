@@ -71,12 +71,26 @@ async function executeActions(actions, { newData, oldData, context, updates, eva
       // Skip undefined results to avoid writing unintentionally
       if (computed !== undefined) {
         logger?.info(`[Automations] action set_field ${action.field} = ${JSON.stringify(computed)}`);
-        updates[action.field] = computed;
+        // Convention: variables starting with "$" are in-memory only and should be available
+        // to subsequent actions through the execution context. They must NOT be written
+        // back to the database via updates.
+        if (typeof action.field === 'string' && action.field.startsWith('$')) {
+          context[action.field] = computed;
+          logger?.info(`[Automations] context set ${action.field}`);
+        } else {
+          updates[action.field] = computed;
+        }
       } else {
         logger?.info(`[Automations] action set_field ${action.field} skipped (undefined)`);
       }
+    } else if (action.type === 'log' && action.message) {
+      const message = await computeValue(action.message, { newData, oldData, context }, evaluator);
+      logger?.info(`[Automations] 📝 ${message}`);
     } else if (action.type === 'for_each') {
+      logger?.info(`[Automations] 🔍 DEBUG for_each action.list = ${JSON.stringify(action.list)}`);
+      logger?.info(`[Automations] 🔍 DEBUG context = ${JSON.stringify(context)}`);
       const list = await computeValue(action.list, { newData, oldData, context }, evaluator);
+      logger?.info(`[Automations] 🔍 DEBUG computed list = ${JSON.stringify(list)}`);
       const arr = Array.isArray(list) ? list : [];
       logger?.info(`[Automations] action for_each iterating over ${arr.length} items`);
       for (let i = 0; i < arr.length; i++) {
@@ -97,8 +111,10 @@ async function executeActions(actions, { newData, oldData, context, updates, eva
       try {
         const created = await executors.create_item({ collection, data, context });
         if (action.assign && created) {
-          context[`$${action.assign}`] = created;
-          logger?.info(`[Automations] assigned $${action.assign} = ${created.id || created}`);
+          // Store the full created object (could be just ID or full object depending on ItemsService response)
+          const assignedValue = typeof created === 'object' && created !== null ? created : { id: created };
+          context[`$${action.assign}`] = assignedValue;
+          logger?.info(`[Automations] assigned $${action.assign} = ${JSON.stringify(assignedValue)}`);
         }
       } catch (e) { logger?.error('[Automations] create_item failed', e?.message || e); }
     } else if (action.type === 'update_item' && executors.update_item) {
@@ -109,8 +125,9 @@ async function executeActions(actions, { newData, oldData, context, updates, eva
       try {
         const updated = await executors.update_item({ collection, id, data, context });
         if (action.assign && updated) {
-          context[`$${action.assign}`] = updated;
-          logger?.info(`[Automations] assigned $${action.assign} = ${updated.id || updated}`);
+          const assignedValue = typeof updated === 'object' && updated !== null ? updated : { id: updated };
+          context[`$${action.assign}`] = assignedValue;
+          logger?.info(`[Automations] assigned $${action.assign} = ${JSON.stringify(assignedValue)}`);
         }
       } catch (e) { logger?.error('[Automations] update_item failed', e?.message || e); }
     } else if (action.type === 'send_email' && executors.send_email) {

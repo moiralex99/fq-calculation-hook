@@ -8,25 +8,27 @@
     </template>
 
     <template #actions>
-      <v-button
-        v-if="!loadingConfig && !configError"
-        rounded
-        icon
-        @click="clearCache"
-        v-tooltip="'Vider le cache'"
-        :loading="clearingCache"
-      >
-        <v-icon name="delete_sweep" />
-      </v-button>
-      <v-button
-        v-if="!loadingConfig && !configError"
-        rounded
-        icon
-        @click="loadFormulas"
-        v-tooltip="'Recharger'"
-      >
-        <v-icon name="refresh" />
-      </v-button>
+      <div class="header-actions">
+        <v-button
+          v-if="!loadingConfig && !configError"
+          rounded
+          icon
+          @click="clearCache"
+          v-tooltip="'Vider le cache'"
+          :loading="clearingCache"
+        >
+          <v-icon name="delete_sweep" />
+        </v-button>
+        <v-button
+          v-if="!loadingConfig && !configError"
+          rounded
+          icon
+          @click="loadFormulas"
+          v-tooltip="'Recharger'"
+        >
+          <v-icon name="refresh" />
+        </v-button>
+      </div>
     </template>
 
     <div class="recalc-module">
@@ -1571,5 +1573,29 @@ async function runRecalculate() {
   padding: 0.5rem;
   border-radius: var(--theme--border-radius);
   border: 1px solid var(--theme--danger);
+}
+
+/* Form Actions - Spacing for buttons */
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.form-actions :deep(.v-button) {
+  flex-shrink: 0;
+}
+
+/* Header Actions - Spacing for header buttons */
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.header-actions :deep(.v-button) {
+  flex-shrink: 0;
 }
 </style>

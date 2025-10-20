@@ -193,6 +193,79 @@ En plus de JSONLogic standard, les opérateurs suivants sont disponibles:
 
 Astuce: dans les helpers d'array, `it` (élément courant) et `acc` (pour reduce) sont dispo dans l'expression JSONLogic.
 
+## 🔑 Résolution de variables dans les opérations
+
+### Comment `{ var: "..." }` est résolu
+
+**Pour la plupart des opérations**, JSONLogic résout automatiquement les variables **avant** de les passer à l'opération.
+
+**Exemples qui fonctionnent directement :**
+
+```json
+// concat résout automatiquement les var
+{ "concat": [{ "var": "$item.name" }, " (Copie)"] }
+
+// date_add résout automatiquement
+{ "date_add": [{ "var": "date_debut" }, 7, "days"] }
+
+// get résout automatiquement
+{ "get": [{ "var": "$new_processus" }, "id"] }
+
+// Arithmétique
+{ "*": [{ "var": "prix" }, { "var": "quantite" }] }
+```
+
+### Cas particulier : `lookup` et `lookup_many`
+
+Ces opérations reçoivent des **objets de filtres Directus** qui contiennent eux-mêmes des variables :
+
+```json
+{
+  "lookup_many": [
+    "calc_tests",
+    { "process": { "_eq": { "var": "$old_process_id" } } },
+    ["id", "a", "b", "process"],
+    500
+  ]
+}
+```
+
+**Problème** : Sans traitement spécial, JSONLogic essayerait d'évaluer `{ "process": ... }` comme une opération, causant "Unrecognized operation process".
+
+**Solution implémentée** : Le système détecte automatiquement les filtres Directus (objets avec clés comme `process`, `status`, etc.) et les protège de l'évaluation JSONLogic. Les variables à l'intérieur (`{ var: "$old_process_id" }`) sont ensuite résolues **après** via `resolveTemplate`.
+
+**Opérateurs de filtre Directus supportés** :
+- Comparaison : `_eq`, `_neq`, `_lt`, `_lte`, `_gt`, `_gte`
+- Ensembles : `_in`, `_nin`, `_between`
+- Null : `_null`, `_nnull`
+- Texte : `_contains`, `_ncontains`, `_contains_all`, `_starts_with`, `_ends_with`
+
+**Si ça ne marche pas** :
+
+1. Vérifiez que votre filtre utilise un des opérateurs Directus ci-dessus
+2. Pour les filtres très complexes ou dynamiques, vous pouvez construire le filtre dans une variable `$` d'abord :
+
+```json
+{
+  "actions": [
+    {
+      "type": "set_field",
+      "field": "$my_filter",
+      "value": { "process": { "_eq": { "var": "$old_process_id" } } }
+    },
+    {
+      "type": "for_each",
+      "list": {
+        "lookup_many": ["calc_tests", { "var": "$my_filter" }, ["id", "a", "b"], 500]
+      },
+      "actions": [...]
+    }
+  ]
+}
+```
+
+3. Si vous voyez "Unrecognized operation X" dans les logs, c'est que X n'est ni une opération JSONLogic, ni un opérateur Directus reconnu. Utilisez la méthode de la variable `$` ci-dessus.
+
 ## Actions avancées
 
 ### for_each — Boucles sur listes O2M/M2M

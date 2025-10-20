@@ -1,0 +1,23 @@
+{
+  "name": "directus-extension-test",
+  "version": "1.0.0",
+  "type": "module",
+  "directus:extension": {
+    "type": "bundle",
+    "host": "^11.0.0",
+    "path": {
+      "app": "dist/index.js",
+      "api": "dist/index.js"
+    },
+    "entries": [
+      {
+        "type": "operation",
+        "name": "test-operation",
+        "source": "src/operation/index.js"
+      }
+    ]
+  },
+  "devDependencies": {
+    "@directus/extensions-sdk": "^11.0.0"
+  }
+}

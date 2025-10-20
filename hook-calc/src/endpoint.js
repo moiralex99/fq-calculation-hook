@@ -237,7 +237,7 @@ export default (router, { services, database, logger, emitter, getSchema }) => {
       
       try {
         const result = dslEvaluator.evaluate(formula, sampleData);
-        const fields = dslEvaluator.extractFields(formula);
+        const fields = dslEvaluator.parser.extractFields(formula);
         
         // Check if formula is local (no relational operations)
         const relationalOps = ['LOOKUP', 'PARENT', 'CHILDREN', 'RELATED', 'SUM', 'AVG', 'COUNT', 'MIN', 'MAX', 'COUNT_DISTINCT'];

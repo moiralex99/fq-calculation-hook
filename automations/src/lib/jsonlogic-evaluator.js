@@ -21,6 +21,11 @@ export function createJsonLogicEvaluator(fetchers = {}) {
     return d.toISOString();
   });
   jsonLogic.add_operation('concat', (...args) => args.filter((x) => x != null).join(''));
+  jsonLogic.add_operation('typeof', (x) => {
+    if (x === null) return 'null';
+    if (Array.isArray(x)) return 'array';
+    return typeof x;
+  });
 
   // Regex matching
   jsonLogic.add_operation('matches', (text, pattern, flags = '') => {
@@ -40,6 +45,41 @@ export function createJsonLogicEvaluator(fetchers = {}) {
       return false;
     }
   });
+
+  // Pass-through literal wrapper to protect plain objects from JSONLogic pre-evaluation
+  jsonLogic.add_operation('literal', (x) => x);
+
+  // Directus-style filter operators: treat as literals so they can appear inside JSONLogic args
+  // Example: { lookup_many: [ 'tasks', { project: { _eq: { var: 'project_id' } } }, ['id'] ] }
+  // Without these, json-logic-js would throw "Unrecognized operation _eq" while pre-evaluating arguments
+  const DIRECTUS_FILTER_OPS = [
+    '_eq', '_neq', '_lt', '_lte', '_gt', '_gte',
+    '_in', '_nin', '_between',
+    '_null', '_nnull',
+    '_contains', '_ncontains', '_contains_all',
+    '_starts_with', '_ends_with'
+  ];
+  for (const opName of DIRECTUS_FILTER_OPS) {
+    jsonLogic.add_operation(opName, (...args) => {
+      // Normalize by operator semantics
+      switch (opName) {
+        case '_null':
+        case '_nnull':
+          return { [opName]: true };
+        case '_between':
+          // Expect two args: min, max
+          return { [opName]: args };
+        case '_in':
+        case '_nin':
+        case '_contains_all':
+          // Accept either array or spread args
+          return { [opName]: Array.isArray(args[0]) ? args[0] : args };
+        default:
+          // Unary operators: _eq, _neq, _lt, _lte, _gt, _gte, _contains, _ncontains, _starts_with, _ends_with
+          return { [opName]: args[0] };
+      }
+    });
+  }
 
   // Case / iif helpers (JSONLogic a déjà "if", mais on propose des alias)
   jsonLogic.add_operation('iif', (cond, thenVal, elseVal) => (cond ? thenVal : elseVal));
@@ -105,6 +145,60 @@ export function createJsonLogicEvaluator(fetchers = {}) {
   // DB lookups (optional)
   const getItem = fetchers.getItem;
   const listItems = fetchers.listItems;
+  
+  // Store global context for lookup operations
+  let globalContext = null;
+  // Store for passing raw, non-JSONLogic objects through evaluation safely
+  let rawStore = new Map();
+  let rawCounter = 0;
+
+  // Operators list to detect JSONLogic vs literal
+  const JSONLOGIC_TOP_OPS = new Set([
+    'var','if','and','or','!','!!','===','==','!=','>','>=','<','<=','+','-','*','/','%','in','cat',
+    'now','date_diff','date_add','concat','matches','imatches','iif','case','get','coalesce','length',
+    'map_by','filter_by','reduce_by','sum_by','any_by','all_by','lookup','lookup_many','changed_to','__ctx','literal',
+    // directus-style filter ops registered above
+    '_eq','_neq','_lt','_lte','_gt','_gte','_in','_nin','_between','_null','_nnull','_contains','_ncontains','_contains_all','_starts_with','_ends_with'
+  ]);
+
+  function preprocessJsonLogic(node) {
+    if (!node || typeof node !== 'object') return node;
+    if (Array.isArray(node)) return node.map(preprocessJsonLogic);
+    const keys = Object.keys(node);
+    if (keys.length === 1 && (keys[0] === 'lookup_many' || keys[0] === 'lookup')) {
+      const op = keys[0];
+      const args = Array.isArray(node[op]) ? node[op].slice() : [];
+      if (op === 'lookup_many' && args.length >= 2) {
+        const filterArg = args[1];
+        if (filterArg && typeof filterArg === 'object' && !Array.isArray(filterArg)) {
+          const fk = Object.keys(filterArg);
+          if (fk.length === 1 && !JSONLOGIC_TOP_OPS.has(fk[0])) {
+            const token = `__RAW__${rawCounter++}`;
+            rawStore.set(token, filterArg);
+            args[1] = token; // plain string token, will not be pre-evaluated
+          }
+        }
+      } else if (op === 'lookup' && args.length >= 3) {
+        const fieldsArg = args[2];
+        if (fieldsArg && typeof fieldsArg === 'object' && !Array.isArray(fieldsArg)) {
+          const fk = Object.keys(fieldsArg);
+          if (fk.length === 1 && !JSONLOGIC_TOP_OPS.has(fk[0])) {
+            const token = `__RAW__${rawCounter++}`;
+            rawStore.set(token, fieldsArg);
+            args[2] = token;
+          }
+        }
+      }
+      const out = {};
+      out[op] = args.map(preprocessJsonLogic);
+      return out;
+    }
+    // default recurse
+    const out = {};
+    for (const [k, v] of Object.entries(node)) out[k] = preprocessJsonLogic(v);
+    return out;
+  }
+  
   function resolveTemplate(node, ctx) {
     if (node && typeof node === 'object') {
       // JSONLogic var shortcut
@@ -119,13 +213,37 @@ export function createJsonLogicEvaluator(fetchers = {}) {
     return node;
   }
   jsonLogic.add_operation('lookup', async (collection, id, fields = ['*'], ctx) => {
-    try { if (!getItem) return null; return await getItem(collection, id, resolveTemplate(fields, ctx)); } catch { return null; }
+    try {
+      if (!getItem) return null;
+      let resolvedFields = fields;
+      if (typeof fields === 'string' && rawStore.has(fields)) {
+        resolvedFields = rawStore.get(fields);
+      }
+      return await getItem(collection, id, resolveTemplate(resolvedFields, ctx));
+    } catch { return null; }
   });
   jsonLogic.add_operation('lookup_many', async (collection, filter = {}, fields = ['*'], limit = 50, ctx) => {
     try {
       if (!listItems) return [];
-      const f = resolveTemplate(filter, ctx) || {};
-      const fld = resolveTemplate(fields, ctx) || ['*'];
+      // Utiliser le contexte fourni ou le contexte global
+      const contextToUse = ctx || globalContext || {};
+      let rawFilter = filter;
+      let rawFields = fields;
+      if (typeof filter === 'string' && rawStore.has(filter)) rawFilter = rawStore.get(filter);
+      if (typeof fields === 'string' && rawStore.has(fields)) rawFields = rawStore.get(fields);
+      const f = resolveTemplate(rawFilter, contextToUse) || {};
+      const fld = resolveTemplate(rawFields, contextToUse) || ['*'];
+      // Debug logs for local testing (kept lightweight)
+      if (process?.env?.AUTOMATIONS_DEBUG === '1') {
+        try {
+          // eslint-disable-next-line no-console
+          console.log('[jsonlogic] lookup_many ctx keys=', Object.keys(contextToUse || {}));
+          // eslint-disable-next-line no-console
+          console.log('[jsonlogic] lookup_many resolved filter=', JSON.stringify(f));
+          // eslint-disable-next-line no-console
+          console.log('[jsonlogic] lookup_many resolved fields=', JSON.stringify(fld));
+        } catch {}
+      }
       const lim = Number.isFinite(limit) ? limit : 50;
       return await listItems(collection, f, fld, lim);
     } catch { return []; }
@@ -153,9 +271,23 @@ export function createJsonLogicEvaluator(fetchers = {}) {
 
   async function evaluateValue(expr, context) {
     try {
+      globalContext = context; // Store context globally
+      rawStore = new Map();
+      rawCounter = 0;
       jsonLogic.add_operation('__ctx', () => context);
-      return await jsonLogic.apply(expr, context);
-    } catch {
+      const safeExpr = preprocessJsonLogic(expr);
+      return await jsonLogic.apply(safeExpr, context);
+    } catch (e) {
+      if (process?.env?.AUTOMATIONS_DEBUG === '1') {
+        try {
+          // eslint-disable-next-line no-console
+          console.error('[jsonlogic] evaluateValue error:', e?.message || e);
+          // eslint-disable-next-line no-console
+          console.error('[jsonlogic] expr:', JSON.stringify(expr));
+          // eslint-disable-next-line no-console
+          console.error('[jsonlogic] context keys:', Object.keys(context || {}));
+        } catch {}
+      }
       return null;
     }
   }

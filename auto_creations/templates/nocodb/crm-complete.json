@@ -1,0 +1,537 @@
+{
+  "name": "CRM Complet",
+  "key": "crm-complete",
+  "description": "Gestion complète de la relation client",
+  "collections": [
+    {
+      "name": "companies",
+      "fields": [
+        {
+          "field": "name",
+          "type": "string",
+          "meta": {
+            "interface": "input",
+            "required": true
+          },
+          "schema": {}
+        },
+        {
+          "field": "industry",
+          "type": "string",
+          "meta": {
+            "interface": "select-dropdown",
+            "required": false,
+            "options": {
+              "choices": [
+                {
+                  "text": "Technology",
+                  "value": "Technology"
+                },
+                {
+                  "text": "Finance",
+                  "value": "Finance"
+                },
+                {
+                  "text": "Healthcare",
+                  "value": "Healthcare"
+                },
+                {
+                  "text": "Manufacturing",
+                  "value": "Manufacturing"
+                },
+                {
+                  "text": "Retail",
+                  "value": "Retail"
+                },
+                {
+                  "text": "Other",
+                  "value": "Other"
+                }
+              ]
+            }
+          },
+          "schema": {}
+        },
+        {
+          "field": "size",
+          "type": "string",
+          "meta": {
+            "interface": "select-dropdown",
+            "required": false,
+            "options": {
+              "choices": [
+                {
+                  "text": "1-10",
+                  "value": "1-10"
+                },
+                {
+                  "text": "11-50",
+                  "value": "11-50"
+                },
+                {
+                  "text": "51-200",
+                  "value": "51-200"
+                },
+                {
+                  "text": "201-500",
+                  "value": "201-500"
+                },
+                {
+                  "text": "500+",
+                  "value": "500+"
+                }
+              ]
+            }
+          },
+          "schema": {}
+        },
+        {
+          "field": "website",
+          "type": "string",
+          "meta": {
+            "interface": "input",
+            "required": false
+          },
+          "schema": {}
+        },
+        {
+          "field": "phone",
+          "type": "string",
+          "meta": {
+            "interface": "input",
+            "required": false
+          },
+          "schema": {}
+        },
+        {
+          "field": "email",
+          "type": "string",
+          "meta": {
+            "interface": "input",
+            "required": false
+          },
+          "schema": {}
+        },
+        {
+          "field": "address",
+          "type": "text",
+          "meta": {
+            "interface": "input-multiline",
+            "required": false
+          },
+          "schema": {}
+        },
+        {
+          "field": "notes",
+          "type": "text",
+          "meta": {
+            "interface": "input-multiline",
+            "required": false
+          },
+          "schema": {}
+        }
+      ],
+      "meta": {
+        "icon": "business",
+        "note": "Companies and organizations"
+      }
+    },
+    {
+      "name": "contacts",
+      "fields": [
+        {
+          "field": "first_name",
+          "type": "string",
+          "meta": {
+            "interface": "input",
+            "required": true
+          },
+          "schema": {}
+        },
+        {
+          "field": "last_name",
+          "type": "string",
+          "meta": {
+            "interface": "input",
+            "required": true
+          },
+          "schema": {}
+        },
+        {
+          "field": "email",
+          "type": "string",
+          "meta": {
+            "interface": "input",
+            "required": false
+          },
+          "schema": {}
+        },
+        {
+          "field": "phone",
+          "type": "string",
+          "meta": {
+            "interface": "input",
+            "required": false
+          },
+          "schema": {}
+        },
+        {
+          "field": "company_id",
+          "type": "integer",
+          "meta": {
+            "interface": "input",
+            "required": false
+          },
+          "schema": {}
+        },
+        {
+          "field": "position",
+          "type": "string",
+          "meta": {
+            "interface": "input",
+            "required": false
+          },
+          "schema": {}
+        },
+        {
+          "field": "linkedin",
+          "type": "string",
+          "meta": {
+            "interface": "input",
+            "required": false
+          },
+          "schema": {}
+        },
+        {
+          "field": "notes",
+          "type": "text",
+          "meta": {
+            "interface": "input-multiline",
+            "required": false
+          },
+          "schema": {}
+        }
+      ],
+      "meta": {
+        "icon": "people",
+        "note": "Contact persons"
+      }
+    },
+    {
+      "name": "deals",
+      "fields": [
+        {
+          "field": "title",
+          "type": "string",
+          "meta": {
+            "interface": "input",
+            "required": true
+          },
+          "schema": {}
+        },
+        {
+          "field": "company_id",
+          "type": "integer",
+          "meta": {
+            "interface": "input",
+            "required": false
+          },
+          "schema": {}
+        },
+        {
+          "field": "contact_id",
+          "type": "integer",
+          "meta": {
+            "interface": "input",
+            "required": false
+          },
+          "schema": {}
+        },
+        {
+          "field": "value",
+          "type": "decimal",
+          "meta": {
+            "interface": "input",
+            "required": false
+          },
+          "schema": {
+            "default_value": 0
+          }
+        },
+        {
+          "field": "stage",
+          "type": "string",
+          "meta": {
+            "interface": "select-dropdown",
+            "required": false,
+            "options": {
+              "choices": [
+                {
+                  "text": "lead",
+                  "value": "lead"
+                },
+                {
+                  "text": "qualified",
+                  "value": "qualified"
+                },
+                {
+                  "text": "proposal",
+                  "value": "proposal"
+                },
+                {
+                  "text": "negotiation",
+                  "value": "negotiation"
+                },
+                {
+                  "text": "won",
+                  "value": "won"
+                },
+                {
+                  "text": "lost",
+                  "value": "lost"
+                }
+              ]
+            }
+          },
+          "schema": {
+            "default_value": "lead"
+          }
+        },
+        {
+          "field": "probability",
+          "type": "decimal",
+          "meta": {
+            "interface": "input",
+            "required": false
+          },
+          "schema": {
+            "default_value": 0
+          }
+        },
+        {
+          "field": "expected_close_date",
+          "type": "date",
+          "meta": {
+            "interface": "datetime",
+            "required": false
+          },
+          "schema": {}
+        },
+        {
+          "field": "notes",
+          "type": "text",
+          "meta": {
+            "interface": "input-multiline",
+            "required": false
+          },
+          "schema": {}
+        }
+      ],
+      "meta": {
+        "icon": "attach_money",
+        "note": "Sales opportunities"
+      }
+    },
+    {
+      "name": "activities",
+      "fields": [
+        {
+          "field": "title",
+          "type": "string",
+          "meta": {
+            "interface": "input",
+            "required": true
+          },
+          "schema": {}
+        },
+        {
+          "field": "type",
+          "type": "string",
+          "meta": {
+            "interface": "select-dropdown",
+            "required": false,
+            "options": {
+              "choices": [
+                {
+                  "text": "call",
+                  "value": "call"
+                },
+                {
+                  "text": "email",
+                  "value": "email"
+                },
+                {
+                  "text": "meeting",
+                  "value": "meeting"
+                },
+                {
+                  "text": "task",
+                  "value": "task"
+                },
+                {
+                  "text": "note",
+                  "value": "note"
+                }
+              ]
+            }
+          },
+          "schema": {}
+        },
+        {
+          "field": "contact_id",
+          "type": "integer",
+          "meta": {
+            "interface": "input",
+            "required": false
+          },
+          "schema": {}
+        },
+        {
+          "field": "deal_id",
+          "type": "integer",
+          "meta": {
+            "interface": "input",
+            "required": false
+          },
+          "schema": {}
+        },
+        {
+          "field": "due_date",
+          "type": "timestamp",
+          "meta": {
+            "interface": "datetime",
+            "required": false
+          },
+          "schema": {}
+        },
+        {
+          "field": "completed",
+          "type": "boolean",
+          "meta": {
+            "interface": "boolean",
+            "required": false
+          },
+          "schema": {
+            "default_value": false,
+            "is_nullable": false
+          }
+        },
+        {
+          "field": "notes",
+          "type": "text",
+          "meta": {
+            "interface": "input-multiline",
+            "required": false
+          },
+          "schema": {}
+        }
+      ],
+      "meta": {
+        "icon": "box",
+        "note": "Activities and interactions"
+      }
+    },
+    {
+      "name": "tasks",
+      "fields": [
+        {
+          "field": "title",
+          "type": "string",
+          "meta": {
+            "interface": "input",
+            "required": true
+          },
+          "schema": {}
+        },
+        {
+          "field": "description",
+          "type": "text",
+          "meta": {
+            "interface": "input-multiline",
+            "required": false
+          },
+          "schema": {}
+        },
+        {
+          "field": "deal_id",
+          "type": "integer",
+          "meta": {
+            "interface": "input",
+            "required": false
+          },
+          "schema": {}
+        },
+        {
+          "field": "due_date",
+          "type": "date",
+          "meta": {
+            "interface": "datetime",
+            "required": false
+          },
+          "schema": {}
+        },
+        {
+          "field": "priority",
+          "type": "string",
+          "meta": {
+            "interface": "select-dropdown",
+            "required": false,
+            "options": {
+              "choices": [
+                {
+                  "text": "low",
+                  "value": "low"
+                },
+                {
+                  "text": "medium",
+                  "value": "medium"
+                },
+                {
+                  "text": "high",
+                  "value": "high"
+                }
+              ]
+            }
+          },
+          "schema": {
+            "default_value": "medium"
+          }
+        },
+        {
+          "field": "status",
+          "type": "string",
+          "meta": {
+            "interface": "select-dropdown",
+            "required": false,
+            "options": {
+              "choices": [
+                {
+                  "text": "todo",
+                  "value": "todo"
+                },
+                {
+                  "text": "in_progress",
+                  "value": "in_progress"
+                },
+                {
+                  "text": "done",
+                  "value": "done"
+                }
+              ]
+            }
+          },
+          "schema": {
+            "default_value": "todo"
+          }
+        }
+      ],
+      "meta": {
+        "icon": "check_box",
+        "note": "Todo tasks"
+      }
+    }
+  ],
+  "version": "1.0.0",
+  "source": "NocoDB",
+  "created_at": "2025-10-20T14:41:17.205Z"
+}

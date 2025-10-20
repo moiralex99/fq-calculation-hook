@@ -1,0 +1,315 @@
+{
+  "resources": [
+    {
+      "name": "Project",
+      "resource_type": "project",
+      "description": "A project represents a prioritized list of tasks",
+      "properties": {
+        "gid": {
+          "type": "string",
+          "description": "Globally unique identifier",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the project",
+          "required": true
+        },
+        "notes": {
+          "type": "string",
+          "description": "More detailed, free-form textual information"
+        },
+        "archived": {
+          "type": "boolean",
+          "description": "True if the project is archived",
+          "default": false
+        },
+        "color": {
+          "type": "enum",
+          "description": "Color of the project"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "current_status": {
+          "type": "object",
+          "description": "The current status of the project"
+        },
+        "due_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "due_on": {
+          "type": "string",
+          "format": "date"
+        },
+        "modified_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "owner_id": {
+          "type": "string",
+          "description": "The owner of the project"
+        },
+        "public": {
+          "type": "boolean",
+          "description": "True if the project is public",
+          "default": true
+        },
+        "start_on": {
+          "type": "string",
+          "format": "date"
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "The workspace the project is in"
+        }
+      }
+    },
+    {
+      "name": "Task",
+      "resource_type": "task",
+      "description": "The task is the basic object around which many operations revolve",
+      "properties": {
+        "gid": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "required": true
+        },
+        "notes": {
+          "type": "string"
+        },
+        "assignee_id": {
+          "type": "string",
+          "description": "User to which this task is assigned"
+        },
+        "completed": {
+          "type": "boolean",
+          "default": false
+        },
+        "completed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "due_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "due_on": {
+          "type": "string",
+          "format": "date"
+        },
+        "liked": {
+          "type": "boolean",
+          "default": false
+        },
+        "modified_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "num_likes": {
+          "type": "number",
+          "readOnly": true,
+          "default": 0
+        },
+        "num_subtasks": {
+          "type": "number",
+          "readOnly": true,
+          "default": 0
+        },
+        "parent_id": {
+          "type": "string",
+          "description": "Parent task, if this is a subtask"
+        },
+        "project_id": {
+          "type": "string",
+          "description": "The project this task is associated with"
+        },
+        "start_on": {
+          "type": "string",
+          "format": "date"
+        },
+        "workspace_id": {
+          "type": "string",
+          "required": true
+        }
+      }
+    },
+    {
+      "name": "User",
+      "resource_type": "user",
+      "description": "A user object represents an account in Asana",
+      "properties": {
+        "gid": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "required": true
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "required": true
+        },
+        "photo": {
+          "type": "object"
+        },
+        "workspaces": {
+          "type": "array"
+        }
+      }
+    },
+    {
+      "name": "Team",
+      "resource_type": "team",
+      "description": "A team is used to group related projects and people together",
+      "properties": {
+        "gid": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "required": true
+        },
+        "description": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "name": "Tag",
+      "resource_type": "tag",
+      "description": "A tag is a label that can be attached to any task",
+      "properties": {
+        "gid": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "required": true
+        },
+        "color": {
+          "type": "enum"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "workspace_id": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "name": "Section",
+      "resource_type": "section",
+      "description": "A section is a subdivision of a project",
+      "properties": {
+        "gid": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "required": true
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "project_id": {
+          "type": "string",
+          "required": true
+        }
+      }
+    },
+    {
+      "name": "Story",
+      "resource_type": "story",
+      "description": "A story represents an activity associated with an object in Asana",
+      "properties": {
+        "gid": {
+          "type": "string",
+          "readOnly": true
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "created_by_id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "text": {
+          "type": "string"
+        },
+        "type": {
+          "type": "enum"
+        },
+        "task_id": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "name": "Attachment",
+      "resource_type": "attachment",
+      "description": "An attachment object represents a file attached to a task",
+      "properties": {
+        "gid": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "required": true
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
+        },
+        "download_url": {
+          "type": "string",
+          "format": "uri",
+          "readOnly": true
+        },
+        "host": {
+          "type": "enum"
+        },
+        "parent_id": {
+          "type": "string"
+        },
+        "size": {
+          "type": "number"
+        },
+        "view_url": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    }
+  ]
+}

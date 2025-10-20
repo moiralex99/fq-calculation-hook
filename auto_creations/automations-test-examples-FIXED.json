@@ -1,0 +1,868 @@
+[
+  {
+    "name": "Auto date_fin quand projet terminé",
+    "description": "Change current item - Mettre date de fin à la date du jour quand le statut passe à Terminé",
+    "status": "active",
+    "collection_cible": "1_projets",
+    "trigger_event": [
+      "update"
+    ],
+    "actions": "1 action(s)",
+    "rule_jsonb": {
+      "==": [
+        {
+          "var": "payload.statut"
+        },
+        "termine"
+      ]
+    },
+    "rule": "Change current item - Mettre date de fin à la date du jour quand le statut passe à Terminé",
+    "actions_jsonb": [
+      {
+        "type": "update_current",
+        "data": {
+          "date_fin": {
+            "now": []
+          }
+        }
+      }
+    ]
+  },
+  {
+    "description": "Change Childs (M2O) - Héritage du statut (statut projet à terminé ==> taches terminées)",
+    "trigger_event": [
+      "update"
+    ],
+    "actions": "1 action(s)",
+    "name": "Cascade statut projet vers tâches",
+    "status": "active",
+    "collection_cible": "1_projets",
+    "rule_jsonb": {
+      "==": [
+        {
+          "var": "payload.statut"
+        },
+        "termine"
+      ]
+    },
+    "rule": "Change Childs (M2O) - Héritage du statut (statut projet à terminé ==> taches terminées)",
+    "actions_jsonb": [
+      {
+        "type": "update_many",
+        "data": {
+          "statut": "termine",
+          "completed": true
+        },
+        "filter": {
+          "_and": [
+            {
+              "projet_id": {
+                "_eq": {
+                  "var": "keys[0]"
+                }
+              }
+            }
+          ]
+        },
+        "collection": [
+          "1_taches"
+        ]
+      }
+    ]
+  },
+  {
+    "description": "Change childs level +2 - Héritage de la priorité sur 3 niveaux",
+    "trigger_event": [
+      "update"
+    ],
+    "actions": "2 action(s)",
+    "name": "Cascade priorité 3 niveaux (Projet > Tâches > Actions)",
+    "status": "active",
+    "collection_cible": "1_projets",
+    "rule_jsonb": {
+      "in": [
+        {
+          "var": "payload.priorite"
+        },
+        [
+          "haute",
+          "critique",
+          "urgente"
+        ]
+      ]
+    },
+    "rule": "Change childs level +2 - Héritage de la priorité sur 3 niveaux",
+    "actions_jsonb": [
+      {
+        "type": "update_many",
+        "data": {
+          "priorite": {
+            "var": "payload.priorite"
+          },
+          "urgent": true
+        },
+        "filter": {
+          "projet_id": {
+            "_eq": {
+              "var": "keys[0]"
+            }
+          }
+        },
+        "collection": [
+          "1_taches"
+        ]
+      },
+      {
+        "type": "update_many",
+        "expand_fields": [
+          "tache_id.projet_id"
+        ],
+        "data": {
+          "statut": "en_cours"
+        },
+        "filter": {
+          "tache_id.projet_id": {
+            "_eq": {
+              "var": "keys[0]"
+            }
+          }
+        },
+        "collection": [
+          "1_taches",
+          "1_actions"
+        ]
+      }
+    ]
+  },
+  {
+    "description": "Create random object - Tâche change de statut, créer une notification",
+    "trigger_event": [
+      "update"
+    ],
+    "actions": "1 action(s)",
+    "name": "Créer notification au changement statut tâche",
+    "status": "active",
+    "collection_cible": "1_taches",
+    "rule_jsonb": {
+      "!=": [
+        {
+          "var": "payload.statut"
+        },
+        {
+          "var": "accountability.payload.statut"
+        }
+      ]
+    },
+    "rule": "Create random object - Tâche change de statut, créer une notification",
+    "actions_jsonb": [
+      {
+        "type": "create_item",
+        "data": {
+          "recipient": {
+            "var": "accountability.user"
+          },
+          "subject": {
+            "cat": [
+              "Tâche '",
+              {
+                "var": "payload.titre"
+              },
+              "' passée en statut ",
+              {
+                "var": "payload.statut"
+              }
+            ]
+          },
+          "message": {
+            "cat": [
+              "La tâche a changé de statut : ",
+              {
+                "var": "accountability.payload.statut"
+              },
+              " → ",
+              {
+                "var": "payload.statut"
+              }
+            ]
+          },
+          "collection": "1_taches",
+          "item": {
+            "var": "keys[0]"
+          }
+        },
+        "collection": "directus_notifications"
+      }
+    ]
+  },
+  {
+    "description": "Duplication sur 2 niveaux - Dupliquer un projet avec toutes ses phases",
+    "trigger_event": [
+      "create"
+    ],
+    "actions": "1 action(s)",
+    "name": "Duplication Projet + Phases (LV2)",
+    "status": "inactive",
+    "collection_cible": "1_projets",
+    "rule_jsonb": {
+      "==": [
+        {
+          "var": "payload.code_projet"
+        },
+        "DUPLICATE"
+      ]
+    },
+    "rule": "Duplication sur 2 niveaux - Dupliquer un projet avec toutes ses phases",
+    "actions_jsonb": [
+      {
+        "type": "for_each",
+        "source_collection": "1_phases",
+        "variable_name": "phase",
+        "actions": [
+          {
+            "type": "create_item",
+            "data": {
+              "nom": {
+                "cat": [
+                  {
+                    "var": "phase.nom"
+                  },
+                  " (copie)"
+                ]
+              },
+              "description": {
+                "var": "phase.description"
+              },
+              "ordre": {
+                "var": "phase.ordre"
+              },
+              "projet_id": {
+                "var": "keys[0]"
+              },
+              "statut": "pas_commence",
+              "duree_estimee_jours": {
+                "var": "phase.duree_estimee_jours"
+              }
+            },
+            "collection": "1_phases"
+          }
+        ],
+        "filter": {
+          "projet_id": {
+            "_eq": {
+              "var": "keys[0]"
+            }
+          }
+        }
+      }
+    ]
+  },
+  {
+    "description": "Duplication sur 3 niveaux - Dupliquer un projet avec phases et tâches",
+    "trigger_event": [
+      "create"
+    ],
+    "actions": "1 action(s)",
+    "name": "Duplication Projet + Phases + Tâches (LV3)",
+    "status": "inactive",
+    "collection_cible": "1_projets",
+    "rule_jsonb": {
+      "==": [
+        {
+          "var": "payload.code_projet"
+        },
+        "DUPLICATE_FULL"
+      ]
+    },
+    "rule": "Duplication sur 3 niveaux - Dupliquer un projet avec phases et tâches",
+    "actions_jsonb": [
+      {
+        "type": "for_each",
+        "source_collection": "1_phases",
+        "variable_name": "phase",
+        "actions": [
+          {
+            "type": "create_item",
+            "store_result_as": "new_phase_id",
+            "data": {
+              "nom": {
+                "cat": [
+                  {
+                    "var": "phase.nom"
+                  },
+                  " (copie)"
+                ]
+              },
+              "projet_id": {
+                "var": "keys[0]"
+              },
+              "statut": "pas_commence"
+            },
+            "collection": "1_phases"
+          },
+          {
+            "type": "for_each",
+            "source_collection": "1_taches",
+            "variable_name": "tache",
+            "actions": [
+              {
+                "type": "create_item",
+                "data": {
+                  "titre": {
+                    "cat": [
+                      {
+                        "var": "tache.titre"
+                      },
+                      " (copie)"
+                    ]
+                  },
+                  "phase_id": {
+                    "var": "new_phase_id"
+                  },
+                  "projet_id": {
+                    "var": "keys[0]"
+                  },
+                  "statut": "a_faire",
+                  "priorite": {
+                    "var": "tache.priorite"
+                  },
+                  "type_tache": {
+                    "var": "tache.type_tache"
+                  }
+                },
+                "collection": "1_taches"
+              }
+            ],
+            "filter": {
+              "phase_id": {
+                "_eq": {
+                  "var": "phase.id"
+                }
+              }
+            }
+          }
+        ],
+        "filter": {
+          "projet_id": {
+            "_eq": {
+              "var": "keys[0]"
+            }
+          }
+        }
+      }
+    ]
+  },
+  {
+    "description": "Assign conditional user 1 - Selon le type de tâche créée, assigner un user différent",
+    "trigger_event": [
+      "create"
+    ],
+    "actions": "1 action(s)",
+    "name": "Assign user selon type tâche",
+    "status": "inactive",
+    "collection_cible": "1_taches",
+    "rule_jsonb": {
+      "in": [
+        {
+          "var": "payload.type_tache"
+        },
+        [
+          "dev",
+          "design",
+          "test"
+        ]
+      ]
+    },
+    "rule": "Assign conditional user 1 - Selon le type de tâche créée, assigner un user différent",
+    "actions_jsonb": [
+      {
+        "type": "update_current",
+        "data": {
+          "user_assigned_id": {
+            "if": [
+              {
+                "==": [
+                  {
+                    "var": "payload.type_tache"
+                  },
+                  "dev"
+                ]
+              },
+              "user-dev-uuid",
+              {
+                "==": [
+                  {
+                    "var": "payload.type_tache"
+                  },
+                  "design"
+                ]
+              },
+              "user-designer-uuid",
+              {
+                "==": [
+                  {
+                    "var": "payload.type_tache"
+                  },
+                  "test"
+                ]
+              },
+              "user-qa-uuid",
+              null
+            ]
+          }
+        }
+      }
+    ]
+  },
+  {
+    "description": "Assign conditional user 2 - Selon le type de tâche ET le département, assigner le user spécialisé",
+    "trigger_event": [
+      "create"
+    ],
+    "actions": "2 action(s)",
+    "name": "Assign user selon type tâche ET département",
+    "status": "inactive",
+    "collection_cible": "1_taches",
+    "rule_jsonb": {
+      "_and": [
+        {
+          "in": [
+            {
+              "var": "payload.type_tache"
+            },
+            [
+              "dev",
+              "design"
+            ]
+          ]
+        }
+      ]
+    },
+    "rule": "Assign conditional user 2 - Selon le type de tâche ET le département, assigner le user spécialisé",
+    "actions_jsonb": [
+      {
+        "type": "lookup",
+        "collection": "1_projets",
+        "key_field": "id",
+        "key_value": {
+          "var": "payload.projet_id"
+        },
+        "select_fields": [
+          "departement_id"
+        ],
+        "store_result_as": "projet_info"
+      },
+      {
+        "type": "update_current",
+        "data": {
+          "user_assigned_id": {
+            "if": [
+              {
+                "_and": [
+                  {
+                    "==": [
+                      {
+                        "var": "payload.type_tache"
+                      },
+                      "dev"
+                    ]
+                  },
+                  {
+                    "==": [
+                      {
+                        "var": "projet_info.departement_id"
+                      },
+                      1
+                    ]
+                  }
+                ]
+              },
+              "user-dev-it-uuid",
+              {
+                "_and": [
+                  {
+                    "==": [
+                      {
+                        "var": "payload.type_tache"
+                      },
+                      "design"
+                    ]
+                  },
+                  {
+                    "==": [
+                      {
+                        "var": "projet_info.departement_id"
+                      },
+                      2
+                    ]
+                  }
+                ]
+              },
+              "user-designer-mkt-uuid",
+              null
+            ]
+          }
+        }
+      }
+    ]
+  },
+  {
+    "description": "Change parents - Tâches ==> Projet - Champ sur le projet (dernière tâche MAJ)",
+    "trigger_event": [
+      "update"
+    ],
+    "actions": "1 action(s)",
+    "name": "Update parent projet (dernière tâche MAJ)",
+    "status": "active",
+    "collection_cible": "1_taches",
+    "rule_jsonb": {
+      "!=": [
+        {
+          "var": "payload.statut"
+        },
+        null
+      ]
+    },
+    "rule": "Change parents - Tâches ==> Projet - Champ sur le projet (dernière tâche MAJ)",
+    "actions_jsonb": [
+      {
+        "type": "update_item",
+        "item_id": {
+          "var": "payload.projet_id"
+        },
+        "data": {
+          "derniere_tache_maj": {
+            "var": "payload.titre"
+          },
+          "date_derniere_maj": {
+            "now": []
+          }
+        },
+        "collection": "1_projets"
+      }
+    ]
+  },
+  {
+    "description": "Change parents level +2 - Actions ==> Tâches ==> Projet - Champ sur le projet (dernière action MAJ)",
+    "trigger_event": [
+      "update"
+    ],
+    "actions": "2 action(s)",
+    "name": "Update parent projet level +2 (dernière action MAJ)",
+    "status": "active",
+    "collection_cible": "1_actions",
+    "rule_jsonb": {
+      "==": [
+        {
+          "var": "payload.completed"
+        },
+        true
+      ]
+    },
+    "rule": "Change parents level +2 - Actions ==> Tâches ==> Projet - Champ sur le projet (dernière action MAJ)",
+    "actions_jsonb": [
+      {
+        "type": "lookup",
+        "collection": "1_taches",
+        "key_field": "id",
+        "key_value": {
+          "var": "payload.tache_id"
+        },
+        "select_fields": [
+          "projet_id",
+          "titre"
+        ],
+        "store_result_as": "tache_info"
+      },
+      {
+        "type": "update_item",
+        "item_id": {
+          "var": "tache_info.projet_id"
+        },
+        "data": {
+          "derniere_action_completee": {
+            "var": "payload.titre"
+          },
+          "derniere_tache_active": {
+            "var": "tache_info.titre"
+          },
+          "date_derniere_maj": {
+            "now": []
+          }
+        },
+        "collection": "1_projets"
+      }
+    ]
+  },
+  {
+    "description": "Calcul automatique de la progression d'une phase basé sur les tâches complétées",
+    "trigger_event": [
+      "update"
+    ],
+    "actions": "2 action(s)",
+    "name": "Auto-calcul progression phase",
+    "status": "active",
+    "collection_cible": "1_taches",
+    "rule_jsonb": {
+      "!=": [
+        {
+          "var": "payload.completed"
+        },
+        {
+          "var": "accountability.payload.completed"
+        }
+      ]
+    },
+    "rule": "Calcul automatique de la progression d'une phase basé sur les tâches complétées",
+    "actions_jsonb": [
+      {
+        "type": "lookup_many",
+        "collection": "1_taches",
+        "select_fields": [
+          "completed"
+        ],
+        "store_result_as": "all_taches",
+        "filter": {
+          "phase_id": {
+            "_eq": {
+              "var": "payload.phase_id"
+            }
+          }
+        }
+      },
+      {
+        "type": "update_item",
+        "item_id": {
+          "var": "payload.phase_id"
+        },
+        "data": {
+          "progression": {
+            "*": [
+              {
+                "/": [
+                  {
+                    "reduce": [
+                      {
+                        "var": "all_taches"
+                      },
+                      {
+                        "+": [
+                          {
+                            "var": "accumulator"
+                          },
+                          {
+                            "if": [
+                              {
+                                "var": "current.completed"
+                              },
+                              1,
+                              0
+                            ]
+                          }
+                        ]
+                      },
+                      0
+                    ]
+                  },
+                  {
+                    "count": [
+                      {
+                        "var": "all_taches"
+                      }
+                    ]
+                  }
+                ]
+              },
+              100
+            ]
+          }
+        },
+        "collection": "1_phases"
+      }
+    ]
+  },
+  {
+    "description": "Calcul automatique du budget utilisé basé sur les coûts réels des tâches",
+    "trigger_event": [
+      "update"
+    ],
+    "actions": "2 action(s)",
+    "name": "Auto-calcul budget utilisé projet",
+    "status": "active",
+    "collection_cible": "1_taches",
+    "rule_jsonb": {
+      "!=": [
+        {
+          "var": "payload.cout_reel"
+        },
+        {
+          "var": "accountability.payload.cout_reel"
+        }
+      ]
+    },
+    "rule": "Calcul automatique du budget utilisé basé sur les coûts réels des tâches",
+    "actions_jsonb": [
+      {
+        "type": "lookup_many",
+        "collection": "1_taches",
+        "select_fields": [
+          "cout_reel"
+        ],
+        "store_result_as": "taches_projet",
+        "filter": {
+          "projet_id": {
+            "_eq": {
+              "var": "payload.projet_id"
+            }
+          }
+        }
+      },
+      {
+        "type": "update_item",
+        "item_id": {
+          "var": "payload.projet_id"
+        },
+        "data": {
+          "budget_utilise": {
+            "reduce": [
+              {
+                "var": "taches_projet"
+              },
+              {
+                "+": [
+                  {
+                    "var": "accumulator"
+                  },
+                  {
+                    "var": "current.cout_reel"
+                  }
+                ]
+              },
+              0
+            ]
+          }
+        },
+        "collection": "1_projets"
+      }
+    ]
+  },
+  {
+    "description": "Auto-marker en_retard = true si deadline < NOW() et tâche non complétée",
+    "trigger_event": [
+      "update"
+    ],
+    "actions": "1 action(s)",
+    "name": "Marquer tâche en retard si deadline dépassée",
+    "status": "active",
+    "collection_cible": "1_taches",
+    "rule_jsonb": {
+      "_and": [
+        {
+          "==": [
+            {
+              "var": "payload.completed"
+            },
+            false
+          ]
+        },
+        {
+          "!=": [
+            {
+              "var": "payload.deadline"
+            },
+            null
+          ]
+        },
+        {
+          "<": [
+            {
+              "var": "payload.deadline"
+            },
+            {
+              "now": []
+            }
+          ]
+        }
+      ]
+    },
+    "rule": "Auto-marker en_retard = true si deadline < NOW() et tâche non complétée",
+    "actions_jsonb": [
+      {
+        "type": "update_current",
+        "data": {
+          "en_retard": true,
+          "urgent": true
+        }
+      }
+    ]
+  },
+  {
+    "description": "Bloquer toutes les phases si budget_utilise > budget_prevu",
+    "trigger_event": [
+      "update"
+    ],
+    "actions": "2 action(s)",
+    "name": "Bloquer phase si budget projet dépassé",
+    "status": "active",
+    "collection_cible": "1_projets",
+    "rule_jsonb": {
+      ">": [
+        {
+          "var": "payload.budget_utilise"
+        },
+        {
+          "var": "payload.budget_prevu"
+        }
+      ]
+    },
+    "rule": "Bloquer toutes les phases si budget_utilise > budget_prevu",
+    "actions_jsonb": [
+      {
+        "type": "update_many",
+        "data": {
+          "bloquee": true,
+          "statut": "bloque"
+        },
+        "filter": {
+          "projet_id": {
+            "_eq": {
+              "var": "keys[0]"
+            }
+          }
+        },
+        "collection": [
+          "1_phases"
+        ]
+      },
+      {
+        "type": "create_item",
+        "data": {
+          "recipient": {
+            "var": "accountability.user"
+          },
+          "subject": {
+            "cat": [
+              "⚠️ Budget dépassé : ",
+              {
+                "var": "payload.nom"
+              }
+            ]
+          },
+          "message": {
+            "cat": [
+              "Le projet a dépassé son budget prévu (",
+              {
+                "var": "payload.budget_prevu"
+              },
+              "€). Budget utilisé : ",
+              {
+                "var": "payload.budget_utilise"
+              },
+              "€"
+            ]
+          }
+        },
+        "collection": "directus_notifications"
+      }
+    ]
+  }
+]

@@ -1,5 +1,20 @@
 # Cas d'usage courants - Automations Directus
 
+## 🧾 Cheatsheet (itérations & agrégations)
+
+- sum_by(array, expr)
+  - Utiliser une CHAÎNE pour expr (ex.: "total_ligne") afin qu’elle soit évaluée pour chaque élément dans le contexte it
+  - Éviter un objet JSONLogic pour expr (ex.: { "var": "it.total_ligne" }) car il serait évalué trop tôt
+- map_by(array, expr)
+  - Utiliser une CHAÎNE (ex.: "prix") pour extraire la valeur par élément
+- filter_by(array, predicate)
+  - Le prédicat est un JSONLogic évalué par élément et voit it.* (ex.: { "===": [{ "var": "it.statut" }, "termine"] })
+- reduce_by(array, init, expr)
+  - Utiliser { "var": "it" } et { "var": "acc" } dans expr
+- items.create
+  - Traité en post-commit (action hook) dans l’engine → les lookups DB (lookup_many) voient un état persistant; les champs calculés sont appliqués via un update séparé (anti-boucle assuré)
+
+
 Ce document présente des exemples concrets et prêts à l'emploi pour les scénarios les plus fréquents.
 
 ## 📋 Table des matières
@@ -100,7 +115,7 @@ Ce document présente des exemples concrets et prêts à l'emploi pour les scén
           "PRJ-",
           { "var": "id" },
           "-",
-          { "date_add": ["NOW()", 0, "days"] }
+          { "date_add": [ { "now": [] }, 0, "days" ] }
         ]
       }
     }
@@ -1317,7 +1332,7 @@ Ce document présente des exemples concrets et prêts à l'emploi pour les scén
       "type": "set_field",
       "field": "$date_limite",
       "value": {
-        "date_add": ["NOW()", -90, "days"]
+  "date_add": [ { "now": [] }, -90, "days" ]
       }
     },
     {
@@ -1399,7 +1414,7 @@ Ce document présente des exemples concrets et prêts à l'emploi pour les scén
         "lookup_many": [
           "lignes_commande",
           { "commande_id": { "_eq": { "var": "commande_id" } } },
-          ["id", "quantite", "prix_unitaire"],
+          ["id", "total_ligne"],
           500
         ]
       }
@@ -1408,10 +1423,7 @@ Ce document présente des exemples concrets et prêts à l'emploi pour les scén
       "type": "set_field",
       "field": "$total",
       "value": {
-        "sum_by": [
-          { "var": "$lignes" },
-          { "*": [{ "var": "it.quantite" }, { "var": "it.prix_unitaire" }] }
-        ]
+        "sum_by": [ { "var": "$lignes" }, "total_ligne" ]
       }
     },
     {
@@ -1426,6 +1438,8 @@ Ce document présente des exemples concrets et prêts à l'emploi pour les scén
   ]
 }
 ```
+
+📝 Remarque: le champ `total_ligne` doit être calculé par une automation séparée sur la collection `lignes_commande` (ex.: `total_ligne = quantite × prix_unitaire`). L’agrégation utilise ensuite `sum_by` avec une chaîne ("total_ligne") pour évaluer la valeur dans le bon contexte d’itération.
 
 ### Exemple 11.2 : Calculer moyenne des notes
 
@@ -1452,7 +1466,7 @@ Ce document présente des exemples concrets et prêts à l'emploi pour les scén
       "type": "set_field",
       "field": "$total_notes",
       "value": {
-        "sum_by": [{ "var": "$avis" }, { "var": "it.note" }]
+        "sum_by": [ { "var": "$avis" }, "note" ]
       }
     },
     {
@@ -1512,7 +1526,7 @@ Ce document présente des exemples concrets et prêts à l'emploi pour les scén
       "type": "set_field",
       "field": "$prix_list",
       "value": {
-        "map_by": [{ "var": "$produits_categorie" }, { "var": "it.prix" }]
+        "map_by": [ { "var": "$produits_categorie" }, "prix" ]
       }
     },
     {
@@ -1582,7 +1596,7 @@ Ce document présente des exemples concrets et prêts à l'emploi pour les scén
       "type": "set_field",
       "field": "date_echeance",
       "value": {
-        "date_add": ["NOW()", { "var": "duree_jours" }, "days"]
+  "date_add": [ { "now": [] }, { "var": "duree_jours" }, "days" ]
       }
     }
   ]
@@ -1602,8 +1616,8 @@ Ce document présente des exemples concrets et prêts à l'emploi pour les scén
       { "!==": [{ "var": "statut" }, "termine"] },
       {
         "and": [
-          { "<=": [{ "date_diff": [{ "var": "date_echeance" }, "NOW()", "hours"] }, 24] },
-          { ">": [{ "date_diff": [{ "var": "date_echeance" }, "NOW()", "hours"] }, 0] }
+          { "<=": [{ "date_diff": [{ "var": "date_echeance" }, { "now": [] }, "hours"] }, 24] },
+          { ">": [{ "date_diff": [{ "var": "date_echeance" }, { "now": [] }, "hours"] }, 0] }
         ]
       },
       { "!==": [{ "var": "alerte_24h_creee" }, true] }
@@ -1621,7 +1635,7 @@ Ce document présente des exemples concrets et prêts à l'emploi pour les scén
             "⏰ La tâche '",
             { "var": "titre" },
             "' arrive à échéance dans ",
-            { "date_diff": [{ "var": "date_echeance" }, "NOW()", "hours"] },
+            { "date_diff": [{ "var": "date_echeance" }, { "now": [] }, "hours"] },
             " heures"
           ]
         },

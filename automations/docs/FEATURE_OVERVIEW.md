@@ -16,7 +16,7 @@ The Automations Engine provides a powerful, code-free automation framework for F
 - ✅ Multi-step actions (set fields, create items, loops, trigger Flows)
 - ✅ Support for complex nested relations (M2O/M2M/O2M)
 - ✅ 20+ custom operators (dates, strings, arrays, regex, DB lookups)
-- ✅ Real-time execution on create/update hooks
+- ✅ Real-time execution on update (pre-commit) and create (post-commit)
 - ✅ Integration with Directus Flows for orchestration
 
 ---
@@ -91,9 +91,9 @@ Access related data in three ways:
 ### 4. Custom Operators
 
 **Dates & Time:**
-- `now()`: Current ISO timestamp
-- `date_add(date, amount, unit)`: Add days/hours/minutes
-- `date_diff(a, b, unit)`: Calculate difference
+- `now()`: Current ISO timestamp — JSONLogic syntax: `{ "now": [] }`
+- `date_add(date, amount, unit)`: Add days/hours/minutes — ex.: `{ "date_add": [ { "now": [] }, 7, "days" ] }`
+- `date_diff(a, b, unit)`: Calculate difference — ex.: `{ "date_diff": [ { "var": "due_at" }, { "now": [] }, "hours" ] }`
 
 **Strings:**
 - `concat(...args)`: Concatenate strings
@@ -105,9 +105,9 @@ Access related data in three ways:
 - `case(c1, v1, c2, v2, ..., default)`: Multi-branch switch
 
 **Arrays:**
-- `sum_by(array, expr)`: Sum numeric values
-- `filter_by(array, predicate)`: Filter items
-- `map_by(array, expr)`: Transform items
+- `sum_by(array, expr)`: Sum numeric values — pass a STRING path for expr (e.g., "total_ligne")
+- `filter_by(array, predicate)`: Filter items — predicate sees `it` (e.g., `{ "===": [{ "var": "it.status" }, "done"] }`)
+- `map_by(array, expr)`: Transform items — pass a STRING path for expr (e.g., "price")
 - `any_by(array, predicate)`: Check if any match
 - `all_by(array, predicate)`: Check if all match
 
@@ -213,7 +213,7 @@ Trigger external systems or complex pipelines:
 ## Technical Architecture
 
 **Extension Type:** Directus Hook  
-**Triggers:** items.create, items.update  
+**Triggers:** items.update (filter, pre-commit) and items.create (action, post-commit)  
 **Storage:** `quartz_automations` collection (JSONB fields)  
 **Performance:** <50ms overhead per automation (tested with 1M calc/min workload)  
 **Dependencies:** json-logic-js  
@@ -225,6 +225,8 @@ Trigger external systems or complex pipelines:
 3. **Engine**: Action orchestration + context management
 4. **Executors**: Real Directus services (ItemsService, custom events)
 
+Note on Create processing: items.create logic runs after commit via an action hook. Calculated fields are persisted with a follow-up update using an accountability flag to prevent loops.
+
 ---
 
 ## Roadmap (V2)
@@ -232,7 +234,7 @@ Trigger external systems or complex pipelines:
 ### Planned Enhancements
 
 **HTTP Endpoints:**
-- `POST /automations/run` — Trigger automation via API/button
+- `POST /quartz-automations/run` — Trigger automation via API/button
 - `GET /automations/list` — List available automations for collection
 - `POST /automations/test` — Dry-run mode (simulate without writing)
 

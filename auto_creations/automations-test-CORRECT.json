@@ -1,0 +1,240 @@
+[
+  {
+    "name": "Auto date_fin quand projet terminé",
+    "description": "Change current item - Mettre date de fin à la date du jour quand le statut passe à Terminé",
+    "status": "active",
+    "collection_cible": "1_projets",
+    "trigger_event": ["update"],
+    "rule_jsonb": {
+      "and": [
+        { "in": ["statut", { "var": "$CHANGED" }] },
+        { "===": [{ "var": "statut" }, "termine"] }
+      ]
+    },
+    "actions_jsonb": [
+      { "type": "set_field", "field": "date_fin", "value": "NOW()" }
+    ]
+  },
+  {
+    "name": "Cascade statut projet vers tâches",
+    "description": "Change Childs (M2O) - Héritage du statut (statut projet à terminé ==> taches terminées)",
+    "status": "active",
+    "collection_cible": "1_projets",
+    "trigger_event": ["update"],
+    "rule_jsonb": {
+      "and": [
+        { "in": ["statut", { "var": "$CHANGED" }] },
+        { "===": [{ "var": "statut" }, "termine"] }
+      ]
+    },
+    "actions_jsonb": [
+      {
+        "type": "update_many",
+        "collection": "1_taches",
+        "filter": {
+          "projet_id": { "_eq": { "var": "id" } }
+        },
+        "data": {
+          "statut": "termine",
+          "completed": true
+        }
+      }
+    ]
+  },
+  {
+    "name": "Cascade priorité 3 niveaux (Projet→Tâches→Actions)",
+    "description": "Change childs level +2 - Cascade priorité sur Projet > Phases > Tâches > Actions",
+    "status": "active",
+    "collection_cible": "1_projets",
+    "trigger_event": ["update"],
+    "rule_jsonb": {
+      "and": [
+        { "in": ["priorite", { "var": "$CHANGED" }] },
+        { "in": [{ "var": "priorite" }, ["haute", "critique"]] }
+      ]
+    },
+    "actions_jsonb": [
+      {
+        "type": "update_many",
+        "collection": "1_phases",
+        "filter": {
+          "projet_id": { "_eq": { "var": "id" } }
+        },
+        "data": {
+          "statut": "en_cours"
+        }
+      },
+      {
+        "type": "update_many",
+        "collection": "1_taches",
+        "filter": {
+          "projet_id": { "_eq": { "var": "id" } }
+        },
+        "data": {
+          "priorite": { "var": "priorite" },
+          "urgent": true
+        }
+      },
+      {
+        "type": "for_each",
+        "list": {
+          "lookup_many": [
+            "1_taches",
+            { "projet_id": { "_eq": { "var": "id" } } },
+            ["id"],
+            500,
+            { "__ctx": [] }
+          ]
+        },
+        "actions": [
+          {
+            "type": "update_many",
+            "collection": "1_actions",
+            "filter": {
+              "tache_id": { "_eq": { "var": "$item.id" } }
+            },
+            "data": {
+              "statut": "en_cours"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Créer notification changement statut",
+    "description": "Create random object - Tâche change de statut, créer une notification",
+    "status": "active",
+    "collection_cible": "1_taches",
+    "trigger_event": ["update"],
+    "rule_jsonb": {
+      "in": ["statut", { "var": "$CHANGED" }]
+    },
+    "actions_jsonb": [
+      {
+        "type": "create_item",
+        "collection": "directus_notifications",
+        "data": {
+          "recipient": "$USER.id",
+          "subject": { "concat": ["Tâche '", { "var": "titre" }, "' → ", { "var": "statut" }] },
+          "message": { "concat": ["La tâche a changé de statut à ", { "var": "statut" }] },
+          "collection": "1_taches",
+          "item": { "var": "id" }
+        }
+      }
+    ]
+  },
+  {
+    "name": "Update parent projet (dernière MAJ)",
+    "description": "Change parents - Tâches ==> Projet",
+    "status": "active",
+    "collection_cible": "1_taches",
+    "trigger_event": ["update"],
+    "rule_jsonb": {
+      "in": ["statut", { "var": "$CHANGED" }]
+    },
+    "actions_jsonb": [
+      {
+        "type": "update_item",
+        "collection": "1_projets",
+        "id": { "var": "projet_id" },
+        "data": {
+          "date_derniere_maj": "NOW()"
+        }
+      }
+    ]
+  },
+  {
+    "name": "Auto-calcul budget utilisé",
+    "description": "Calcul automatique du budget utilisé basé sur les coûts réels des tâches",
+    "status": "active",
+    "collection_cible": "1_taches",
+    "trigger_event": ["update"],
+    "rule_jsonb": {
+      "in": ["cout_reel", { "var": "$CHANGED" }]
+    },
+    "actions_jsonb": [
+      {
+        "type": "lookup_many",
+        "collection": "1_taches",
+        "filter": {
+          "projet_id": { "_eq": { "var": "projet_id" } }
+        },
+        "select_fields": ["cout_reel"],
+        "store_result_as": "taches_projet"
+      },
+      {
+        "type": "update_item",
+        "collection": "1_projets",
+        "id": { "var": "projet_id" },
+        "data": {
+          "budget_utilise": {
+            "reduce": [
+              { "var": "taches_projet" },
+              {
+                "+": [
+                  { "var": "accumulator" },
+                  { "var": "current.cout_reel" }
+                ]
+              },
+              0
+            ]
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "Marquer tâche en retard",
+    "description": "Auto-marker en_retard = true si deadline < NOW() et tâche non complétée",
+    "status": "active",
+    "collection_cible": "1_taches",
+    "trigger_event": ["update"],
+    "rule_jsonb": {
+      "and": [
+        { "===": [{ "var": "completed" }, false] },
+        { "!==": [{ "var": "deadline" }, null] },
+        { "<": [{ "var": "deadline" }, "NOW()"] }
+      ]
+    },
+    "actions_jsonb": [
+      { "type": "set_field", "field": "en_retard", "value": true },
+      { "type": "set_field", "field": "urgent", "value": true }
+    ]
+  },
+  {
+    "name": "Bloquer phase si budget dépassé",
+    "description": "Bloquer toutes les phases si budget_utilise > budget_prevu",
+    "status": "active",
+    "collection_cible": "1_projets",
+    "trigger_event": ["update"],
+    "rule_jsonb": {
+      "and": [
+        { "in": ["budget_utilise", { "var": "$CHANGED" }] },
+        { ">": [{ "var": "budget_utilise" }, { "var": "budget_prevu" }] }
+      ]
+    },
+    "actions_jsonb": [
+      {
+        "type": "update_many",
+        "collection": "1_phases",
+        "filter": {
+          "projet_id": { "_eq": { "var": "id" } }
+        },
+        "data": {
+          "bloquee": true,
+          "statut": "bloque"
+        }
+      },
+      {
+        "type": "create_item",
+        "collection": "directus_notifications",
+        "data": {
+          "recipient": "$USER.id",
+          "subject": { "concat": ["⚠️ Budget dépassé : ", { "var": "nom" }] },
+          "message": { "concat": ["Budget prévu: ", { "var": "budget_prevu" }, "€ - Utilisé: ", { "var": "budget_utilise" }, "€"] }
+        }
+      }
+    ]
+  }
+]

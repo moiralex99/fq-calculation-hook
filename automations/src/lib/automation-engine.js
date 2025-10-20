@@ -53,102 +53,108 @@ export function createAutomationEngine({ evaluator, logger, executors = {} }) {
 
 async function executeActions(actions, { newData, oldData, context, updates, evaluator, logger, executors }) {
   for (const action of actions) {
-    // Optional per-action guard: action.when (evaluate whenever the key exists)
-    if (Object.prototype.hasOwnProperty.call(action, 'when')) {
-      try {
-        const ok = await evaluator.evaluateRule(action.when, context);
-        if (!ok) {
-          logger?.info(`[Automations] action ${action.type} skipped by when`);
+    try {
+      // Optional per-action guard: action.when (evaluate whenever the key exists)
+      if (Object.prototype.hasOwnProperty.call(action, 'when')) {
+        try {
+          const ok = await evaluator.evaluateRule(action.when, context);
+          if (!ok) {
+            logger?.info(`[Automations] action ${action.type} skipped by when`);
+            continue;
+          }
+        } catch {
+          logger?.info(`[Automations] action ${action.type} skipped (when evaluation error)`);
           continue;
         }
-      } catch {
-        logger?.info(`[Automations] action ${action.type} skipped (when evaluation error)`);
-        continue;
       }
-    }
-    if (action.type === 'set_field' && action.field) {
-      const computed = await computeValue(action.value, { newData, oldData, context }, evaluator);
-      // Skip undefined results to avoid writing unintentionally
-      if (computed !== undefined) {
-        logger?.info(`[Automations] action set_field ${action.field} = ${JSON.stringify(computed)}`);
-        // Convention: variables starting with "$" are in-memory only and should be available
-        // to subsequent actions through the execution context. They must NOT be written
-        // back to the database via updates.
-        if (typeof action.field === 'string' && action.field.startsWith('$')) {
-          context[action.field] = computed;
-          logger?.info(`[Automations] context set ${action.field}`);
+      if (action.type === 'set_field' && action.field) {
+        const computed = await computeValue(action.value, { newData, oldData, context }, evaluator);
+        // Skip undefined results to avoid writing unintentionally
+        if (computed !== undefined) {
+          logger?.info(`[Automations] action set_field ${action.field} = ${JSON.stringify(computed)}`);
+          // Convention: variables starting with "$" are in-memory only and should be available
+          // to subsequent actions through the execution context. They must NOT be written
+          // back to the database via updates.
+          if (typeof action.field === 'string' && action.field.startsWith('$')) {
+            context[action.field] = computed;
+            logger?.info(`[Automations] context set ${action.field}`);
+          } else {
+            updates[action.field] = computed;
+          }
         } else {
-          updates[action.field] = computed;
+          logger?.info(`[Automations] action set_field ${action.field} skipped (undefined)`);
         }
-      } else {
-        logger?.info(`[Automations] action set_field ${action.field} skipped (undefined)`);
+      } else if (action.type === 'log' && action.message) {
+        const message = await computeValue(action.message, { newData, oldData, context }, evaluator);
+        logger?.info(`[Automations] 📝 ${message}`);
+      } else if (action.type === 'for_each') {
+        logger?.info(`[Automations] 🔍 DEBUG for_each action.list = ${JSON.stringify(action.list)}`);
+        logger?.info(`[Automations] 🔍 DEBUG context = ${JSON.stringify(context)}`);
+        const list = await computeValue(action.list, { newData, oldData, context }, evaluator);
+        logger?.info(`[Automations] 🔍 DEBUG computed list = ${JSON.stringify(list)}`);
+        const arr = Array.isArray(list) ? list : [];
+        logger?.info(`[Automations] action for_each iterating over ${arr.length} items`);
+        for (let i = 0; i < arr.length; i++) {
+          const item = arr[i];
+          const nestedContext = { ...context, $item: item, $index: i, $parent: context.$item || null };
+          const nestedActions = Array.isArray(action.actions) ? action.actions : [];
+          await executeActions(nestedActions, { newData, oldData, context: nestedContext, updates, evaluator, logger, executors });
+        }
+      } else if (action.type === 'trigger_flow' && executors.trigger_flow) {
+        const key = action.key || action.flow_key || action.flow;
+        const payload = await resolveDeepValues(action.payload || {}, { newData, oldData, context }, evaluator);
+        logger?.info(`[Automations] action trigger_flow key=${key} payload=${JSON.stringify(payload)}`);
+        try { await executors.trigger_flow({ key, payload, context }); } catch (e) { logger?.error('[Automations] trigger_flow failed', e?.message || e); }
+      } else if (action.type === 'create_item' && executors.create_item) {
+        const data = await resolveDeepValues(action.data || {}, { newData, oldData, context }, evaluator);
+        const collection = action.collection;
+        logger?.info(`[Automations] action create_item in ${collection} data=${JSON.stringify(data)}`);
+        try {
+          const created = await executors.create_item({ collection, data, context });
+          if (action.assign && created) {
+            // Store the full created object (could be just ID or full object depending on ItemsService response)
+            const assignedValue = typeof created === 'object' && created !== null ? created : { id: created };
+            context[`$${action.assign}`] = assignedValue;
+            logger?.info(`[Automations] assigned $${action.assign} = ${JSON.stringify(assignedValue)}`);
+          }
+        } catch (e) { logger?.error('[Automations] create_item failed', e?.message || e); }
+      } else if (action.type === 'update_item' && executors.update_item) {
+        const data = await resolveDeepValues(action.data || {}, { newData, oldData, context }, evaluator);
+        const id = await computeValue(action.id, { newData, oldData, context }, evaluator);
+        const collection = action.collection;
+        logger?.info(`[Automations] action update_item in ${collection} id=${id} data=${JSON.stringify(data)}`);
+        try {
+          const updated = await executors.update_item({ collection, id, data, context });
+          if (action.assign && updated) {
+            const assignedValue = typeof updated === 'object' && updated !== null ? updated : { id: updated };
+            context[`$${action.assign}`] = assignedValue;
+            logger?.info(`[Automations] assigned $${action.assign} = ${JSON.stringify(assignedValue)}`);
+          }
+        } catch (e) { logger?.error('[Automations] update_item failed', e?.message || e); }
+      } else if (action.type === 'send_email' && executors.send_email) {
+        const to = await computeValue(action.to, { newData, oldData, context }, evaluator);
+        const subject = await computeValue(action.subject, { newData, oldData, context }, evaluator);
+        const body = await computeValue(action.body, { newData, oldData, context }, evaluator);
+        logger?.info(`[Automations] action send_email to=${JSON.stringify(to)} subject=${JSON.stringify(subject)}`);
+        try { await executors.send_email({ to, subject, body, context }); } catch (e) { logger?.error('[Automations] send_email failed', e?.message || e); }
+      } else if (action.type === 'update_many' && executors.update_many) {
+        const data = await resolveDeepValues(action.data || {}, { newData, oldData, context }, evaluator);
+        const filter = await resolveDeepValues(action.filter || {}, { newData, oldData, context }, evaluator);
+        const limit = await computeValue(action.limit, { newData, oldData, context }, evaluator);
+        const collection = action.collection;
+        logger?.info(`[Automations] action update_many in ${collection} filter=${JSON.stringify(filter)} data=${JSON.stringify(data)} limit=${JSON.stringify(limit)}`);
+        try {
+          const result = await executors.update_many({ collection, filter, data, limit, context });
+          if (action.assign && result) {
+            context[`$${action.assign}`] = result;
+            logger?.info(`[Automations] assigned $${action.assign} = ${JSON.stringify(result)}`);
+          }
+        } catch (e) { logger?.error('[Automations] update_many failed', e?.message || e); }
       }
-    } else if (action.type === 'log' && action.message) {
-      const message = await computeValue(action.message, { newData, oldData, context }, evaluator);
-      logger?.info(`[Automations] 📝 ${message}`);
-    } else if (action.type === 'for_each') {
-      logger?.info(`[Automations] 🔍 DEBUG for_each action.list = ${JSON.stringify(action.list)}`);
-      logger?.info(`[Automations] 🔍 DEBUG context = ${JSON.stringify(context)}`);
-      const list = await computeValue(action.list, { newData, oldData, context }, evaluator);
-      logger?.info(`[Automations] 🔍 DEBUG computed list = ${JSON.stringify(list)}`);
-      const arr = Array.isArray(list) ? list : [];
-      logger?.info(`[Automations] action for_each iterating over ${arr.length} items`);
-      for (let i = 0; i < arr.length; i++) {
-        const item = arr[i];
-        const nestedContext = { ...context, $item: item, $index: i, $parent: context.$item || null };
-        const nestedActions = Array.isArray(action.actions) ? action.actions : [];
-        await executeActions(nestedActions, { newData, oldData, context: nestedContext, updates, evaluator, logger, executors });
-      }
-    } else if (action.type === 'trigger_flow' && executors.trigger_flow) {
-      const key = action.key || action.flow_key || action.flow;
-      const payload = await resolveDeepValues(action.payload || {}, { newData, oldData, context }, evaluator);
-      logger?.info(`[Automations] action trigger_flow key=${key} payload=${JSON.stringify(payload)}`);
-      try { await executors.trigger_flow({ key, payload, context }); } catch (e) { logger?.error('[Automations] trigger_flow failed', e?.message || e); }
-    } else if (action.type === 'create_item' && executors.create_item) {
-      const data = await resolveDeepValues(action.data || {}, { newData, oldData, context }, evaluator);
-      const collection = action.collection;
-      logger?.info(`[Automations] action create_item in ${collection} data=${JSON.stringify(data)}`);
-      try {
-        const created = await executors.create_item({ collection, data, context });
-        if (action.assign && created) {
-          // Store the full created object (could be just ID or full object depending on ItemsService response)
-          const assignedValue = typeof created === 'object' && created !== null ? created : { id: created };
-          context[`$${action.assign}`] = assignedValue;
-          logger?.info(`[Automations] assigned $${action.assign} = ${JSON.stringify(assignedValue)}`);
-        }
-      } catch (e) { logger?.error('[Automations] create_item failed', e?.message || e); }
-    } else if (action.type === 'update_item' && executors.update_item) {
-      const data = await resolveDeepValues(action.data || {}, { newData, oldData, context }, evaluator);
-      const id = await computeValue(action.id, { newData, oldData, context }, evaluator);
-      const collection = action.collection;
-      logger?.info(`[Automations] action update_item in ${collection} id=${id} data=${JSON.stringify(data)}`);
-      try {
-        const updated = await executors.update_item({ collection, id, data, context });
-        if (action.assign && updated) {
-          const assignedValue = typeof updated === 'object' && updated !== null ? updated : { id: updated };
-          context[`$${action.assign}`] = assignedValue;
-          logger?.info(`[Automations] assigned $${action.assign} = ${JSON.stringify(assignedValue)}`);
-        }
-      } catch (e) { logger?.error('[Automations] update_item failed', e?.message || e); }
-    } else if (action.type === 'send_email' && executors.send_email) {
-      const to = await computeValue(action.to, { newData, oldData, context }, evaluator);
-      const subject = await computeValue(action.subject, { newData, oldData, context }, evaluator);
-      const body = await computeValue(action.body, { newData, oldData, context }, evaluator);
-      logger?.info(`[Automations] action send_email to=${JSON.stringify(to)} subject=${JSON.stringify(subject)}`);
-      try { await executors.send_email({ to, subject, body, context }); } catch (e) { logger?.error('[Automations] send_email failed', e?.message || e); }
-    } else if (action.type === 'update_many' && executors.update_many) {
-      const data = await resolveDeepValues(action.data || {}, { newData, oldData, context }, evaluator);
-      const filter = await resolveDeepValues(action.filter || {}, { newData, oldData, context }, evaluator);
-      const limit = await computeValue(action.limit, { newData, oldData, context }, evaluator);
-      const collection = action.collection;
-      logger?.info(`[Automations] action update_many in ${collection} filter=${JSON.stringify(filter)} data=${JSON.stringify(data)} limit=${JSON.stringify(limit)}`);
-      try {
-        const result = await executors.update_many({ collection, filter, data, limit, context });
-        if (action.assign && result) {
-          context[`$${action.assign}`] = result;
-          logger?.info(`[Automations] assigned $${action.assign} = ${JSON.stringify(result)}`);
-        }
-      } catch (e) { logger?.error('[Automations] update_many failed', e?.message || e); }
+    } catch (error) {
+      logger?.error(`[Automations] ❌ action ${action.type} failed:`, error?.message || error);
+      logger?.error(`[Automations] ⚠️  Skipping remaining actions in this automation to prevent cascade failures`);
+      break; // Stop executing remaining actions to prevent cascade failures
     }
   }
 }

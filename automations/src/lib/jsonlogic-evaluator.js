@@ -219,7 +219,7 @@ export function createJsonLogicEvaluator(fetchers = {}) {
       if (typeof fields === 'string' && rawStore.has(fields)) {
         resolvedFields = rawStore.get(fields);
       }
-      return await getItem(collection, id, resolveTemplate(resolvedFields, ctx));
+      return await getItem(collection, id, resolveTemplate(resolvedFields, ctx), ctx);
     } catch { return null; }
   });
   jsonLogic.add_operation('lookup_many', async (collection, filter = {}, fields = ['*'], limit = 50, ctx) => {
@@ -245,7 +245,7 @@ export function createJsonLogicEvaluator(fetchers = {}) {
         } catch {}
       }
       const lim = Number.isFinite(limit) ? limit : 50;
-      return await listItems(collection, f, fld, lim);
+      return await listItems(collection, f, fld, lim, contextToUse);
     } catch { return []; }
   });
   jsonLogic.add_operation('changed_to', (field, value, changed, context) => {

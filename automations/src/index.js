@@ -6,15 +6,17 @@ export default ({ action, filter }, { services, database, logger, getSchema }) =
   const { ItemsService } = services;
   // Provide DB-backed fetchers for nested lookups inside JSONLogic
   const evaluator = createJsonLogicEvaluator({
-    getItem: async (collection, id, fields = ['*']) => {
+    getItem: async (collection, id, fields = ['*'], ctx) => {
       const schema = await getSchema();
       const service = new ItemsService(collection, { database, schema });
-      return service.readOne(id, { fields });
+      const accountability = { user: ctx?.$USER?.id };
+      return service.readOne(id, { fields, accountability });
     },
-    listItems: async (collection, filter = {}, fields = ['*'], limit = 50) => {
+    listItems: async (collection, filter = {}, fields = ['*'], limit = 50, ctx) => {
       const schema = await getSchema();
       const service = new ItemsService(collection, { database, schema });
-      const res = await service.readByQuery({ filter, fields, limit });
+      const accountability = { user: ctx?.$USER?.id };
+      const res = await service.readByQuery({ filter, fields, limit, accountability });
       return Array.isArray(res) ? res : (res?.data || []);
     }
   });
@@ -225,9 +227,14 @@ export default ({ action, filter }, { services, database, logger, getSchema }) =
     }
   });
 
-  // Core hook: before write
+  // Core hook: before write (UPDATE)
   filter('items.update', async (payload, meta) => {
     try {
+      // Skip if this update was triggered by our automation (avoid feedback loop)
+      if (meta?.accountability?._automationTriggered) {
+        logger.info(`[Automations] items.update on ${meta?.collection} SKIPPED (automation-triggered)`);
+        return payload;
+      }
       // If updating automations table, schedule reload and skip processing
       if (meta?.collection === 'quartz_automations') {
         logger.info(`[Automations] ✏️ Detected update on quartz_automations (via filter), scheduling reload`);
@@ -297,74 +304,56 @@ export default ({ action, filter }, { services, database, logger, getSchema }) =
       return payload;
     }
   });
-
-  filter('items.create', async (payload, meta) => {
+  
+  // Move CREATE processing to an ACTION (post-commit) to ensure DB consistency for lookups
+  action('items.create', async ({ collection, key, payload }, meta) => {
     try {
-      // If creating automation, schedule reload and skip processing
-      if (meta?.collection === 'quartz_automations') {
-        logger.info(`[Automations] 🆕 Detected create on quartz_automations (via filter), scheduling reload`);
+      // If creating automation config, reload and exit
+      if (collection === 'quartz_automations') {
+        logger.info(`[Automations] 🆕 Detected create on quartz_automations (action), scheduling reload`);
         scheduleReload('items.create on quartz_automations');
-        return payload;
+        return;
       }
 
-      // Filter automations that should trigger on 'create' event AND match this collection
-      const createAutomations = filterAutomationsByEvent(automations, 'create')
-        .filter(a => matchesCollection(a, meta.collection));
-      
-      if (createAutomations.length === 0) return payload;
-      
-      // Skip if this create was triggered by an automation (prevent infinite loops)
+      // Skip if this create was triggered by our own automation
       if (meta?.accountability?._automationTriggered) {
-        logger.info(`[Automations] items.create on ${meta.collection} SKIPPED (automation-triggered)`);
-        return payload;
+        logger.info(`[Automations] items.create ACTION on ${collection} SKIPPED (automation-triggered)`);
+        return;
       }
-      
-  logger.info(`[Automations] items.create on ${meta.collection} rules=${createAutomations.length}`);
-      const results = {};
-      const promises = [];
-      for (const rule of createAutomations) {
-        const throttleMs = Number(rule.throttle_ms) || 0;
-        const scope = rule.throttle_scope || 'rule';
-        if (throttleMs > 0) {
-          const key = makeThrottleKey({ rule, collection: meta.collection, meta, scope });
-          if (throttleTimers.has(key)) clearTimeout(throttleTimers.get(key).timer);
-          const record = throttleTimers.get(key) || { lastPayload: null, lastOriginal: null };
-          record.lastPayload = payload;
-          record.lastOriginal = null;
-          const timer = setTimeout(async () => {
-            try {
-              const updates = await engine.evaluate({
-                collection: meta.collection,
-                automations: [rule],
-                newData: record.lastPayload,
-                oldData: record.lastOriginal,
-                context: { $USER: meta?.accountability?.user }
-              });
-              Object.assign(results, updates);
-            } catch (e) { logger.error('[Automations] throttled evaluate failed', e?.message || e); }
-            throttleTimers.delete(key);
-          }, throttleMs);
-          throttleTimers.set(key, { ...record, timer });
-        } else {
-          promises.push(engine.evaluate({
-            collection: meta.collection,
-            automations: [rule],
-            newData: payload,
-            oldData: null,
-            context: { $USER: meta?.accountability?.user }
-          }).then(updates => Object.assign(results, updates)).catch(e => logger.error('[Automations] evaluate failed', e?.message || e)));
-        }
-      }
-      await Promise.all(promises);
-      if (Object.keys(results).length > 0) {
-        logger.info(`[Automations] updates computed → ${JSON.stringify(results)}`);
+
+      // Find automations for 'create' on this collection
+      const createAutomations = filterAutomationsByEvent(automations, 'create')
+        .filter(a => matchesCollection(a, collection));
+      if (createAutomations.length === 0) return;
+
+      logger.info(`[Automations] items.create ACTION on ${collection} id=${key} rules=${createAutomations.length}`);
+
+      // Read the freshly created item to use as newData
+      const schema = await getSchema();
+      const service = new services.ItemsService(collection, { database, schema });
+      // Optionally honor expand fields
+      const expandFields = collectExpandFields(createAutomations, collection);
+      const createdItem = await service.readOne(key, expandFields.length ? { fields: expandFields } : undefined);
+
+      // Evaluate rules to compute set_field updates (in-memory)
+      const updates = await engine.evaluate({
+        collection,
+        automations: createAutomations,
+        newData: createdItem,
+        oldData: null,
+        context: { $USER: meta?.accountability?.user }
+      });
+
+      // If any updates were computed, persist them via a separate updateOne
+      if (updates && Object.keys(updates).length > 0) {
+        const accountability = { user: meta?.accountability?.user, _automationTriggered: true };
+        await service.updateOne(key, updates, { accountability });
+        logger.info(`[Automations] ✅ Applied post-create updates on ${collection}.${key}: ${JSON.stringify(updates)}`);
       } else {
-        logger.info('[Automations] no updates computed');
+        logger.info('[Automations] no post-create updates computed');
       }
-      return { ...payload, ...results };
     } catch (err) {
-      logger.error('[Automations] Error in items.create:', err?.message || err);
-      return payload;
+      logger.error('[Automations] Error in items.create ACTION:', err?.message || err);
     }
   });
 };
@@ -412,6 +401,9 @@ function filterAutomationsByEvent(automations, event) {
     } else {
       events = ['update']; // fallback
     }
+    
+    // Normalize events: remove "items." prefix if present
+    events = events.map(e => e.replace(/^items\./, ''));
     
     // Check if wildcard or event matches
     return events.includes('*') || events.includes(event);

@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fluent Design Theme - Demo</title>
+    <style>
+        /* Reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Variables Fluent */
+        :root {
+            --fluent-blue: #0078D4;
+            --fluent-blue-hover: #106EBE;
+            --fluent-gray-10: #FAF9F8;
+            --fluent-gray-20: #F3F2F1;
+            --fluent-gray-30: #EDEBE9;
+            --fluent-gray-130: #605E5C;
+            --fluent-gray-190: #323130;
+            --fluent-success: #107C10;
+            --fluent-warning: #F7630C;
+            --fluent-danger: #D13438;
+        }
+
+        body {
+            font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", sans-serif;
+            background: var(--fluent-gray-10);
+            color: var(--fluent-gray-190);
+            padding: 40px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--fluent-gray-190);
+        }
+
+        .subtitle {
+            color: var(--fluent-gray-130);
+            margin-bottom: 40px;
+            font-size: 16px;
+        }
+
+        /* Header */
+        .demo-header {
+            background: white;
+            padding: 20px 24px;
+            border-radius: 8px;
+            box-shadow: 0 0.3px 0.9px rgba(0, 0, 0, 0.07), 0 1.6px 3.6px rgba(0, 0, 0, 0.11);
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .demo-header h2 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        /* Card */
+        .card {
+            background: white;
+            border: 1px solid var(--fluent-gray-30);
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 1.6px 3.6px rgba(0, 0, 0, 0.05);
+        }
+
+        .card h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--fluent-gray-190);
+        }
+
+        /* Buttons */
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 6px;
+            border: none;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: var(--fluent-blue);
+            color: white;
+            box-shadow: 0 1.6px 3.6px rgba(0, 120, 212, 0.2);
+        }
+
+        .btn-primary:hover {
+            background: var(--fluent-blue-hover);
+            box-shadow: 0 3.2px 7.2px rgba(0, 120, 212, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--fluent-gray-20);
+            color: var(--fluent-gray-190);
+            border: 1px solid var(--fluent-gray-30);
+        }
+
+        .btn-secondary:hover {
+            background: var(--fluent-gray-30);
+        }
+
+        .btn-success {
+            background: var(--fluent-success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #0B6A0B;
+        }
+
+        .btn-warning {
+            background: var(--fluent-warning);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #D83B01;
+        }
+
+        .btn-danger {
+            background: var(--fluent-danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #A4262C;
+        }
+
+        /* Inputs */
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: var(--fluent-gray-190);
+        }
+
+        input[type="text"],
+        input[type="email"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--fluent-gray-30);
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 14px;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        input:hover,
+        textarea:hover,
+        select:hover {
+            border-color: var(--fluent-blue);
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--fluent-blue);
+            box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
+        }
+
+        /* Color Swatches */
+        .colors {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 12px;
+        }
+
+        .color-swatch {
+            text-align: center;
+        }
+
+        .color-box {
+            width: 100%;
+            height: 60px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            border: 1px solid var(--fluent-gray-30);
+        }
+
+        .color-label {
+            font-size: 12px;
+            color: var(--fluent-gray-130);
+        }
+
+        .color-hex {
+            font-size: 11px;
+            font-family: "Cascadia Code", Consolas, monospace;
+            color: var(--fluent-gray-130);
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-right: 8px;
+        }
+
+        .badge-primary {
+            background: rgba(0, 120, 212, 0.1);
+            color: var(--fluent-blue);
+        }
+
+        .badge-success {
+            background: rgba(16, 124, 16, 0.1);
+            color: var(--fluent-success);
+        }
+
+        .badge-warning {
+            background: rgba(247, 99, 12, 0.1);
+            color: var(--fluent-warning);
+        }
+
+        .badge-danger {
+            background: rgba(209, 52, 56, 0.1);
+            color: var(--fluent-danger);
+        }
+
+        /* Navigation Demo */
+        .nav-demo {
+            background: var(--fluent-gray-20);
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .nav-item {
+            padding: 10px 16px;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            color: var(--fluent-gray-130);
+        }
+
+        .nav-item:hover {
+            background: rgba(0, 120, 212, 0.08);
+            color: var(--fluent-gray-190);
+        }
+
+        .nav-item.active {
+            background: rgba(0, 120, 212, 0.12);
+            color: var(--fluent-blue);
+            font-weight: 500;
+        }
+
+        /* Alert */
+        .alert {
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            border-left: 4px solid;
+        }
+
+        .alert-info {
+            background: rgba(0, 120, 212, 0.08);
+            border-left-color: var(--fluent-blue);
+            color: var(--fluent-gray-190);
+        }
+
+        .alert-success {
+            background: rgba(16, 124, 16, 0.08);
+            border-left-color: var(--fluent-success);
+            color: var(--fluent-gray-190);
+        }
+
+        .alert-warning {
+            background: rgba(247, 99, 12, 0.08);
+            border-left-color: var(--fluent-warning);
+            color: var(--fluent-gray-190);
+        }
+
+        .alert-danger {
+            background: rgba(209, 52, 56, 0.08);
+            border-left-color: var(--fluent-danger);
+            color: var(--fluent-gray-190);
+        }
+
+        /* Typography Samples */
+        .typography h1,
+        .typography h2,
+        .typography h3,
+        .typography h4 {
+            margin-bottom: 8px;
+        }
+
+        .typography p {
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Fluent Design Theme - Démo Interactive</h1>
+        <p class="subtitle">Aperçu du thème avant installation dans Directus</p>
+
+        <div class="demo-header">
+            <h2>Dashboard</h2>
+            <div class="btn-group">
+                <button class="btn btn-secondary">Export</button>
+                <button class="btn btn-primary">Create New</button>
+            </div>
+        </div>
+
+        <div class="grid">
+            <!-- Palette de couleurs -->
+            <div class="card">
+                <h3>Palette de Couleurs</h3>
+                <div class="colors">
+                    <div class="color-swatch">
+                        <div class="color-box" style="background: #0078D4;"></div>
+                        <div class="color-label">Primary</div>
+                        <div class="color-hex">#0078D4</div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-box" style="background: #107C10;"></div>
+                        <div class="color-label">Success</div>
+                        <div class="color-hex">#107C10</div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-box" style="background: #F7630C;"></div>
+                        <div class="color-label">Warning</div>
+                        <div class="color-hex">#F7630C</div>
+                    </div>
+                    <div class="color-swatch">
+                        <div class="color-box" style="background: #D13438;"></div>
+                        <div class="color-label">Danger</div>
+                        <div class="color-hex">#D13438</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Boutons -->
+            <div class="card">
+                <h3>Boutons</h3>
+                <div class="btn-group">
+                    <button class="btn btn-primary">Primary</button>
+                    <button class="btn btn-secondary">Secondary</button>
+                </div>
+                <br><br>
+                <div class="btn-group">
+                    <button class="btn btn-success">Success</button>
+                    <button class="btn btn-warning">Warning</button>
+                    <button class="btn btn-danger">Danger</button>
+                </div>
+            </div>
+
+            <!-- Badges -->
+            <div class="card">
+                <h3>Badges</h3>
+                <div>
+                    <span class="badge badge-primary">Active</span>
+                    <span class="badge badge-success">Published</span>
+                    <span class="badge badge-warning">Pending</span>
+                    <span class="badge badge-danger">Archived</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form -->
+        <div class="card" style="margin-bottom: 24px;">
+            <h3>Formulaire</h3>
+            <div class="input-group">
+                <label for="name">Nom</label>
+                <input type="text" id="name" placeholder="Entrez votre nom">
+            </div>
+            <div class="input-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" placeholder="exemple@mail.com">
+            </div>
+            <div class="input-group">
+                <label for="message">Message</label>
+                <textarea id="message" rows="4" placeholder="Votre message..."></textarea>
+            </div>
+            <button class="btn btn-primary">Envoyer</button>
+        </div>
+
+        <!-- Alerts -->
+        <div class="card" style="margin-bottom: 24px;">
+            <h3>Notifications</h3>
+            <div class="alert alert-info">
+                <strong>Info:</strong> Ceci est une notification d'information.
+            </div>
+            <div class="alert alert-success">
+                <strong>Succès:</strong> Votre action a été effectuée avec succès!
+            </div>
+            <div class="alert alert-warning">
+                <strong>Attention:</strong> Veuillez vérifier cette information.
+            </div>
+            <div class="alert alert-danger">
+                <strong>Erreur:</strong> Une erreur s'est produite.
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="grid">
+            <div class="card">
+                <h3>Navigation</h3>
+                <div class="nav-demo">
+                    <div class="nav-item active">📊 Dashboard</div>
+                    <div class="nav-item">📁 Content</div>
+                    <div class="nav-item">👥 Users</div>
+                    <div class="nav-item">⚙️ Settings</div>
+                </div>
+            </div>
+
+            <div class="card typography">
+                <h3>Typographie</h3>
+                <h1 style="font-size: 24px;">Heading 1</h1>
+                <h2 style="font-size: 20px;">Heading 2</h2>
+                <h3 style="font-size: 18px;">Heading 3</h3>
+                <h4 style="font-size: 16px;">Heading 4</h4>
+                <p>Texte normal avec la police Segoe UI. Lorem ipsum dolor sit amet.</p>
+                <p style="font-family: 'Cascadia Code', Consolas, monospace; font-size: 12px; background: var(--fluent-gray-20); padding: 8px; border-radius: 4px;">
+                    Code: const theme = 'fluent';
+                </p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; margin-top: 40px; color: var(--fluent-gray-130);">
+            <p>Thème Fluent Design pour Directus • Inspiré par Microsoft Fluent Design System</p>
+            <p style="font-size: 12px; margin-top: 8px;">
+                Pour installer ce thème, consultez <strong>INSTALLATION.md</strong>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Interactivité basique pour la démo
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>

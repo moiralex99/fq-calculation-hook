@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aperçu Simple - Thème Fluent Design pour Directus</title>
+    <style>
+        /* Import du CSS Fluent Simple */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Fira+Code:wght@400&display=swap');
+
+        /* Reset de base */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Variables Fluent Design (comme dans Directus) */
+        :root {
+            /* Couleurs principales */
+            --theme--primary: #0078D4;
+            --theme--background: #FAF9F8;
+            --theme--foreground: #323130;
+            --theme--border-color: #EDEBE9;
+            --theme--success: #107C10;
+            --theme--warning: #FFB900;
+            --theme--danger: #D13438;
+            
+            /* Polices */
+            --theme--fonts--sans--font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+            --theme--fonts--display--font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+            --theme--fonts--monospace--font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+            
+            /* Border radius Fluent */
+            --theme--border-radius: 4px;
+        }
+
+        body {
+            font-family: var(--theme--fonts--sans--font-family);
+            background: var(--theme--background);
+            color: var(--theme--foreground);
+            line-height: 1.6;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-family: var(--theme--fonts--display--font-family);
+            font-weight: 600;
+            color: var(--theme--foreground);
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+
+        .subtitle {
+            color: #605E5C;
+            margin-bottom: 40px;
+            font-size: 16px;
+        }
+
+        .section {
+            background: white;
+            border: 1px solid var(--theme--border-color);
+            border-radius: var(--theme--border-radius);
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            font-family: var(--theme--fonts--display--font-family);
+            font-weight: 600;
+            color: var(--theme--foreground);
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        /* Palette de couleurs */
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .color-card {
+            border: 1px solid var(--theme--border-color);
+            border-radius: var(--theme--border-radius);
+            overflow: hidden;
+        }
+
+        .color-sample {
+            height: 100px;
+        }
+
+        .color-info {
+            padding: 15px;
+            background: white;
+        }
+
+        .color-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .color-hex {
+            font-family: var(--theme--fonts--monospace--font-family);
+            font-size: 12px;
+            color: #605E5C;
+        }
+
+        /* Boutons Fluent */
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: var(--theme--border-radius);
+            border: 1px solid transparent;
+            font-family: var(--theme--fonts--sans--font-family);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-primary {
+            background: var(--theme--primary);
+            color: white;
+            border-color: var(--theme--primary);
+        }
+
+        .btn-primary:hover {
+            background: #106EBE;
+            border-color: #106EBE;
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--theme--foreground);
+            border-color: #8A8886;
+        }
+
+        .btn-secondary:hover {
+            background: #F3F2F1;
+            border-color: #323130;
+        }
+
+        .btn-success {
+            background: var(--theme--success);
+            color: white;
+            border-color: var(--theme--success);
+        }
+
+        .btn-success:hover {
+            background: #0E6B0E;
+        }
+
+        .btn-warning {
+            background: var(--theme--warning);
+            color: #323130;
+            border-color: var(--theme--warning);
+        }
+
+        .btn-danger {
+            background: var(--theme--danger);
+            color: white;
+            border-color: var(--theme--danger);
+        }
+
+        /* Formulaires Fluent */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--theme--foreground);
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #8A8886;
+            border-radius: var(--theme--border-radius);
+            font-family: var(--theme--fonts--sans--font-family);
+            font-size: 14px;
+            background: white;
+            color: var(--theme--foreground);
+            transition: border-color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        input:hover,
+        textarea:hover,
+        select:hover {
+            border-color: #323130;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--theme--primary);
+            box-shadow: 0 0 0 1px var(--theme--primary);
+        }
+
+        /* Typography samples */
+        .typography-sample {
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #F3F2F1;
+            border-radius: var(--theme--border-radius);
+        }
+
+        .font-display {
+            font-family: var(--theme--fonts--display--font-family);
+            font-weight: 600;
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .font-sans {
+            font-family: var(--theme--fonts--sans--font-family);
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        .font-mono {
+            font-family: var(--theme--fonts--monospace--font-family);
+            font-size: 13px;
+            background: white;
+            padding: 8px;
+            border-radius: 2px;
+        }
+
+        /* Toggle Mode Sombre */
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: var(--theme--primary);
+            color: white;
+            border: none;
+            border-radius: var(--theme--border-radius);
+            font-family: var(--theme--fonts--sans--font-family);
+            font-weight: 600;
+            cursor: pointer;
+            z-index: 1000;
+        }
+
+        /* Mode Sombre */
+        body.dark {
+            --theme--primary: #4CC2FF;
+            --theme--background: #1B1A19;
+            --theme--foreground: #F3F2F1;
+            --theme--border-color: #323130;
+            --theme--success: #6CCB5F;
+            --theme--warning: #FFC83D;
+            --theme--danger: #F1707B;
+        }
+
+        body.dark .section {
+            background: #252423;
+            border-color: #323130;
+        }
+
+        body.dark .color-info {
+            background: #252423;
+        }
+
+        body.dark input,
+        body.dark textarea,
+        body.dark select {
+            background: #252423;
+            border-color: #605E5C;
+            color: #F3F2F1;
+        }
+
+        body.dark input:hover,
+        body.dark textarea:hover,
+        body.dark select:hover {
+            border-color: #C8C6C4;
+        }
+
+        body.dark .btn-secondary {
+            background: #252423;
+            color: #F3F2F1;
+            border-color: #605E5C;
+        }
+
+        body.dark .btn-secondary:hover {
+            background: #2B2A29;
+            border-color: #C8C6C4;
+        }
+
+        body.dark .typography-sample {
+            background: #2B2A29;
+        }
+
+        body.dark .font-mono {
+            background: #1B1A19;
+        }
+    </style>
+</head>
+<body>
+    <button class="theme-toggle" onclick="toggleDarkMode()">🌙 Mode Sombre</button>
+
+    <div class="container">
+        <h1>Thème Fluent Design Simple pour Directus</h1>
+        <p class="subtitle">Aperçu des couleurs et polices - Sans modification des alignements</p>
+
+        <!-- Palette de couleurs -->
+        <div class="section">
+            <h2>Palette de Couleurs Fluent</h2>
+            <div class="color-grid">
+                <div class="color-card">
+                    <div class="color-sample" style="background: #0078D4;"></div>
+                    <div class="color-info">
+                        <div class="color-name">Communication Blue</div>
+                        <div class="color-hex">#0078D4</div>
+                    </div>
+                </div>
+                <div class="color-card">
+                    <div class="color-sample" style="background: #107C10;"></div>
+                    <div class="color-info">
+                        <div class="color-name">Success Green</div>
+                        <div class="color-hex">#107C10</div>
+                    </div>
+                </div>
+                <div class="color-card">
+                    <div class="color-sample" style="background: #FFB900;"></div>
+                    <div class="color-info">
+                        <div class="color-name">Warning Yellow</div>
+                        <div class="color-hex">#FFB900</div>
+                    </div>
+                </div>
+                <div class="color-card">
+                    <div class="color-sample" style="background: #D13438;"></div>
+                    <div class="color-info">
+                        <div class="color-name">Danger Red</div>
+                        <div class="color-hex">#D13438</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Typographie -->
+        <div class="section">
+            <h2>Typographie Fluent</h2>
+            <div class="typography-sample">
+                <div class="font-display">Segoe UI Display - Titres</div>
+                <div style="color: #605E5C; font-size: 12px;">Font: Segoe UI | Weight: 600</div>
+            </div>
+            <div class="typography-sample">
+                <div class="font-sans">Segoe UI - Corps de texte et interface</div>
+                <div style="color: #605E5C; font-size: 12px;">Font: Segoe UI | Weight: 400</div>
+            </div>
+            <div class="typography-sample">
+                <div class="font-mono">const code = "Cascadia Code - Monospace";</div>
+                <div style="color: #605E5C; font-size: 12px;">Font: Cascadia Code / Fira Code | Weight: 400</div>
+            </div>
+        </div>
+
+        <!-- Boutons -->
+        <div class="section">
+            <h2>Boutons Fluent</h2>
+            <div class="button-group">
+                <button class="btn btn-primary">Primaire</button>
+                <button class="btn btn-secondary">Secondaire</button>
+                <button class="btn btn-success">Succès</button>
+                <button class="btn btn-warning">Avertissement</button>
+                <button class="btn btn-danger">Danger</button>
+            </div>
+        </div>
+
+        <!-- Formulaires -->
+        <div class="section">
+            <h2>Formulaires Fluent</h2>
+            <div class="form-group">
+                <label for="name">Nom complet</label>
+                <input type="text" id="name" placeholder="Entrez votre nom">
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" placeholder="exemple@email.com">
+            </div>
+            <div class="form-group">
+                <label for="role">Rôle</label>
+                <select id="role">
+                    <option>Administrateur</option>
+                    <option>Éditeur</option>
+                    <option>Lecteur</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="message">Message</label>
+                <textarea id="message" rows="4" placeholder="Entrez votre message"></textarea>
+            </div>
+            <button class="btn btn-primary">Envoyer</button>
+        </div>
+
+        <!-- Instructions -->
+        <div class="section">
+            <h2>📋 Installation</h2>
+            <p style="margin-bottom: 15px;">Pour appliquer ce thème à Directus :</p>
+            <ol style="line-height: 2; padding-left: 20px;">
+                <li>Ouvrez le fichier <code style="background: #F3F2F1; padding: 2px 6px; border-radius: 2px; font-family: var(--theme--fonts--monospace--font-family);">fluent-simple.css</code></li>
+                <li>Copiez tout le contenu (Ctrl+A, Ctrl+C)</li>
+                <li>Dans Directus : Settings → Project Settings → Custom CSS</li>
+                <li>Collez le CSS et sauvegardez</li>
+                <li>Rafraîchissez votre page Directus</li>
+            </ol>
+            <p style="margin-top: 15px; color: #605E5C; font-size: 14px;">
+                ✅ Ce thème modifie <strong>uniquement</strong> les couleurs et polices.<br>
+                ✅ Les alignements et espacements natifs de Directus sont conservés.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark');
+            const btn = document.querySelector('.theme-toggle');
+            btn.textContent = document.body.classList.contains('dark') ? '☀️ Mode Clair' : '🌙 Mode Sombre';
+        }
+    </script>
+</body>
+</html>

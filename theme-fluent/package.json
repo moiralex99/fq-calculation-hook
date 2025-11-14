@@ -1,0 +1,29 @@
+{
+  "name": "directus-extension-theme-fluent",
+  "version": "1.0.0",
+  "description": "Fluent Design inspired theme for Directus",
+  "type": "module",
+  "keywords": [
+    "directus",
+    "directus-extension",
+    "directus-custom-theme",
+    "fluent-design"
+  ],
+  "directus:extension": {
+    "type": "theme",
+    "path": "dist/index.js",
+    "source": "src/index.ts",
+    "host": "^11.0.0"
+  },
+  "scripts": {
+    "build": "directus-extension build",
+    "dev": "directus-extension build --watch"
+  },
+  "devDependencies": {
+    "@directus/extensions-sdk": "^12.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@directus/extensions-sdk": "^12.0.0"
+  }
+}

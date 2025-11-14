@@ -1,0 +1,232 @@
+/**
+ * Thème Fluent Design pour Directus - Version Simple
+ * 
+ * Cette version modifie UNIQUEMENT les couleurs et les polices
+ * sans toucher aux alignements, espacements ou structure de Directus.
+ * 
+ * Installation :
+ * 1. Copier tout ce fichier (Ctrl+A, Ctrl+C)
+ * 2. Aller dans Directus → Settings → Project Settings → Custom CSS
+ * 3. Coller et sauvegarder
+ * 4. Rafraîchir la page
+ */
+
+:root {
+	/* ==========================================
+	   COULEURS FLUENT DESIGN
+	   ========================================== */
+	
+	/* Couleur primaire - Fluent Communication Blue */
+	--theme--primary: #0078D4;
+	--theme--primary-background: color-mix(in srgb, var(--theme--background), #0078D4 10%);
+	--theme--primary-subdued: color-mix(in srgb, var(--theme--background), #0078D4 50%);
+	--theme--primary-accent: color-mix(in srgb, #0078D4, #2e3c43 25%);
+	
+	/* Couleur secondaire - Fluent Pink/Magenta */
+	--theme--secondary: #E3008C;
+	--theme--secondary-background: color-mix(in srgb, var(--theme--background), #E3008C 10%);
+	--theme--secondary-subdued: color-mix(in srgb, var(--theme--background), #E3008C 50%);
+	--theme--secondary-accent: color-mix(in srgb, #E3008C, #2e3c43 25%);
+	
+	/* Arrière-plans - Fluent Warm White */
+	--theme--background: #FAF9F8;
+	--theme--background-normal: #F3F2F1;
+	--theme--background-accent: #EDEBE9;
+	--theme--background-subdued: #FFFFFF;
+	
+	/* Textes - Fluent Neutral Grays */
+	--theme--foreground: #323130;
+	--theme--foreground-accent: #201F1E;
+	--theme--foreground-subdued: #605E5C;
+	
+	/* Bordures - Tons neutres */
+	--theme--border-color: #EDEBE9;
+	--theme--border-color-accent: #E1DFDD;
+	--theme--border-color-subdued: #F3F2F1;
+	
+	/* Succès - Fluent Green */
+	--theme--success: #107C10;
+	--theme--success-background: color-mix(in srgb, var(--theme--background), #107C10 10%);
+	--theme--success-subdued: color-mix(in srgb, var(--theme--background), #107C10 50%);
+	--theme--success-accent: color-mix(in srgb, #107C10, #2e3c43 25%);
+	
+	/* Avertissement - Fluent Yellow/Orange */
+	--theme--warning: #FFB900;
+	--theme--warning-background: color-mix(in srgb, var(--theme--background), #FFB900 10%);
+	--theme--warning-subdued: color-mix(in srgb, var(--theme--background), #FFB900 50%);
+	--theme--warning-accent: color-mix(in srgb, #FFB900, #2e3c43 25%);
+	
+	/* Danger - Fluent Red */
+	--theme--danger: #D13438;
+	--theme--danger-background: color-mix(in srgb, var(--theme--background), #D13438 10%);
+	--theme--danger-subdued: color-mix(in srgb, var(--theme--background), #D13438 50%);
+	--theme--danger-accent: color-mix(in srgb, #D13438, #2e3c43 25%);
+	
+	/* ==========================================
+	   TYPOGRAPHIE FLUENT
+	   ========================================== */
+	
+	/* Police principale - Segoe UI */
+	--theme--fonts--sans--font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", "Helvetica Neue", Arial, sans-serif;
+	--theme--fonts--sans--font-weight: 400;
+	
+	/* Police d'affichage (titres) */
+	--theme--fonts--display--font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", "Helvetica Neue", Arial, sans-serif;
+	--theme--fonts--display--font-weight: 600;
+	
+	/* Police monospace - Cascadia Code (fallback Consolas) */
+	--theme--fonts--monospace--font-family: "Cascadia Code", "Cascadia Mono", Consolas, "Courier New", monospace;
+	--theme--fonts--monospace--font-weight: 400;
+	
+	/* ==========================================
+	   NAVIGATION - Couleurs Fluent
+	   ========================================== */
+	
+	--theme--navigation--background: #F3F2F1;
+	--theme--navigation--background-accent: #EDEBE9;
+	
+	/* Module actif */
+	--theme--navigation--modules--button--foreground: #323130;
+	--theme--navigation--modules--button--foreground-hover: #0078D4;
+	--theme--navigation--modules--button--foreground-active: #0078D4;
+	--theme--navigation--modules--button--background-active: #DEECF9;
+	
+	/* ==========================================
+	   HEADER - Couleurs Fluent
+	   ========================================== */
+	
+	--theme--header--background: #FFFFFF;
+	--theme--header--border-color: #EDEBE9;
+	
+	/* ==========================================
+	   FORMULAIRES - Couleurs Fluent
+	   ========================================== */
+	
+	--theme--form--field--input--background: #FFFFFF;
+	--theme--form--field--input--foreground: #323130;
+	--theme--form--field--input--border-color: #8A8886;
+	--theme--form--field--input--border-color-hover: #323130;
+	--theme--form--field--input--border-color-focus: #0078D4;
+	
+	/* Labels */
+	--theme--form--field--label--foreground: #323130;
+	
+	/* ==========================================
+	   SIDEBAR - Couleurs Fluent
+	   ========================================== */
+	
+	--theme--sidebar--background: #FFFFFF;
+	--theme--sidebar--border-color: #EDEBE9;
+	
+	/* ==========================================
+	   BOUTONS - Couleurs Fluent
+	   ========================================== */
+	
+	/* Bouton primaire */
+	--v-button-background-color: #0078D4;
+	--v-button-background-color-hover: #106EBE;
+	--v-button-color: #FFFFFF;
+	
+	/* ==========================================
+	   COINS ARRONDIS FLUENT
+	   ========================================== */
+	
+	--theme--border-radius: 4px;
+}
+
+/* ==========================================
+   MODE SOMBRE FLUENT
+   ========================================== */
+
+body.dark {
+	/* Couleur primaire - Fluent Light Blue pour mode sombre */
+	--theme--primary: #4CC2FF;
+	--theme--primary-background: color-mix(in srgb, var(--theme--background), #4CC2FF 10%);
+	--theme--primary-subdued: color-mix(in srgb, var(--theme--background), #4CC2FF 50%);
+	--theme--primary-accent: color-mix(in srgb, #4CC2FF, #16151a 25%);
+	
+	/* Couleur secondaire */
+	--theme--secondary: #FF6CE8;
+	--theme--secondary-background: color-mix(in srgb, var(--theme--background), #FF6CE8 10%);
+	--theme--secondary-subdued: color-mix(in srgb, var(--theme--background), #FF6CE8 50%);
+	--theme--secondary-accent: color-mix(in srgb, #FF6CE8, #16151a 25%);
+	
+	/* Arrière-plans - Fluent Dark */
+	--theme--background: #1B1A19;
+	--theme--background-normal: #252423;
+	--theme--background-accent: #2B2A29;
+	--theme--background-subdued: #151413;
+	
+	/* Textes - Fluent Light Grays */
+	--theme--foreground: #F3F2F1;
+	--theme--foreground-accent: #FFFFFF;
+	--theme--foreground-subdued: #C8C6C4;
+	
+	/* Bordures */
+	--theme--border-color: #323130;
+	--theme--border-color-accent: #3B3A39;
+	--theme--border-color-subdued: #292827;
+	
+	/* Succès */
+	--theme--success: #6CCB5F;
+	--theme--success-background: color-mix(in srgb, var(--theme--background), #6CCB5F 10%);
+	--theme--success-subdued: color-mix(in srgb, var(--theme--background), #6CCB5F 50%);
+	--theme--success-accent: color-mix(in srgb, #6CCB5F, #16151a 25%);
+	
+	/* Avertissement */
+	--theme--warning: #FFC83D;
+	--theme--warning-background: color-mix(in srgb, var(--theme--background), #FFC83D 10%);
+	--theme--warning-subdued: color-mix(in srgb, var(--theme--background), #FFC83D 50%);
+	--theme--warning-accent: color-mix(in srgb, #FFC83D, #16151a 25%);
+	
+	/* Danger */
+	--theme--danger: #F1707B;
+	--theme--danger-background: color-mix(in srgb, var(--theme--background), #F1707B 10%);
+	--theme--danger-subdued: color-mix(in srgb, var(--theme--background), #F1707B 50%);
+	--theme--danger-accent: color-mix(in srgb, #F1707B, #16151a 25%);
+	
+	/* Navigation */
+	--theme--navigation--background: #252423;
+	--theme--navigation--background-accent: #2B2A29;
+	
+	/* Module actif */
+	--theme--navigation--modules--button--foreground: #F3F2F1;
+	--theme--navigation--modules--button--foreground-hover: #4CC2FF;
+	--theme--navigation--modules--button--foreground-active: #4CC2FF;
+	--theme--navigation--modules--button--background-active: #1B3951;
+	
+	/* Header */
+	--theme--header--background: #1B1A19;
+	--theme--header--border-color: #323130;
+	
+	/* Formulaires */
+	--theme--form--field--input--background: #252423;
+	--theme--form--field--input--foreground: #F3F2F1;
+	--theme--form--field--input--border-color: #605E5C;
+	--theme--form--field--input--border-color-hover: #C8C6C4;
+	--theme--form--field--input--border-color-focus: #4CC2FF;
+	
+	/* Sidebar */
+	--theme--sidebar--background: #1B1A19;
+	--theme--sidebar--border-color: #323130;
+	
+	/* Boutons */
+	--v-button-background-color: #4CC2FF;
+	--v-button-background-color-hover: #6BD6FF;
+	--v-button-color: #1B1A19;
+}
+
+/* ==========================================
+   IMPORT POLICES GOOGLE FONTS (OPTIONNEL)
+   Si Segoe UI n'est pas disponible sur Linux/Mac
+   ========================================== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Fira+Code:wght@400&display=swap');
+
+/* Fallback pour les systèmes sans Segoe UI */
+@supports not (font-family: "Segoe UI") {
+	:root {
+		--theme--fonts--sans--font-family: "Inter", -apple-system, BlinkMacSystemFont, "Roboto", "Helvetica Neue", Arial, sans-serif;
+		--theme--fonts--display--font-family: "Inter", -apple-system, BlinkMacSystemFont, "Roboto", "Helvetica Neue", Arial, sans-serif;
+		--theme--fonts--monospace--font-family: "Fira Code", Consolas, "Courier New", monospace;
+	}
+}

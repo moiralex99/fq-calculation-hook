@@ -296,6 +296,78 @@ export default ({ filter, action }, { services, exceptions, logger, database, ge
   }
 
   /**
+   * FILTER pour calculs rapides (< 2s) - Optimise l'UX en renvoyant les valeurs calculées
+   * Si timeout ou erreur, l'ACTION ci-dessous servira de safety net
+   */
+  filter('items.update', async (payload, meta, context) => {
+    const { collection, keys } = meta;
+    
+    // Skip si modification de la table des formules
+    if (collection === 'quartz_formulas') {
+      return payload;
+    }
+    
+    // Charger les formules si pas encore fait
+    if (Object.keys(formulaConfigs).length === 0) {
+      await loadFormulasAndBuildGraphs();
+    }
+    
+    // Skip si aucune formule pour cette collection
+    if (!formulaConfigs[collection] || Object.keys(formulaConfigs[collection]).length === 0) {
+      return payload;
+    }
+    
+    try {
+      // Timeout de 2 secondes pour ne pas bloquer l'API
+      const calculationPromise = (async () => {
+        const { ItemsService } = services;
+        const itemsService = new ItemsService(collection, {
+          database,
+          schema: context.schema || (typeof getSchema === 'function' ? await getSchema() : undefined),
+          accountability: context.accountability
+        });
+        
+        // Lire l'item actuel
+        const currentItem = await itemsService.readOne(keys[0]);
+        
+        // Fusionner avec les nouvelles valeurs
+        const mergedData = { ...currentItem, ...payload };
+        
+        // Calculer les champs
+        const changedFields = Object.keys(payload);
+        const { updates, hasChanges } = calculateFields(collection, mergedData, changedFields);
+        
+        return { updates, hasChanges };
+      })();
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Calculation timeout')), 2000)
+      );
+      
+      const { updates, hasChanges } = await Promise.race([
+        calculationPromise,
+        timeoutPromise
+      ]);
+      
+      // ✅ Injecter les valeurs calculées dans le payload
+      if (hasChanges && Object.keys(updates).length > 0) {
+        Object.assign(payload, updates);
+        logger.info(`[RealTime-Calc] ✅ Fast calculation succeeded for ${collection}.${keys[0]}:`, updates);
+      }
+      
+    } catch (error) {
+      // ⚠️ Timeout ou erreur → On laisse passer, l'action va s'en occuper
+      if (error.message === 'Calculation timeout') {
+        logger.warn(`[RealTime-Calc] ⏱️ Fast calculation timeout for ${collection}.${keys[0]}, will retry in action`);
+      } else {
+        logger.warn(`[RealTime-Calc] ⚠️ Fast calculation failed for ${collection}.${keys[0]}: ${error.message}, will retry in action`);
+      }
+    }
+    
+    return payload;
+  });
+
+  /**
    * Hook APRÈS la création d'un item (stratégie ACTION qui fonctionne)
    * Fait un UPDATE séparé pour garantir la persistence
    */
@@ -350,11 +422,12 @@ export default ({ filter, action }, { services, exceptions, logger, database, ge
   });
 
   /**
-   * Hook APRÈS la modification d'un item (stratégie ACTION qui fonctionne)
-   * Fait un UPDATE séparé pour garantir la persistence
+   * Hook APRÈS la modification d'un item (stratégie ACTION - Safety Net)
+   * Recalcule si le filter a timeout ou échoué
+   * Garantit la cohérence même en cas d'erreur dans le filter
    */
   action('items.update', async ({ collection, keys, payload }, { schema, accountability }) => {
-    logger.info(`[RealTime-Calc] ✏️ items.update ACTION for ${collection}, keys:`, keys);
+    logger.info(`[RealTime-Calc] ✏️ items.update ACTION (safety net) for ${collection}, keys:`, keys);
     logger.debug(`[RealTime-Calc] Payload:`, payload);
     // Si on modifie la table des formules, recharger à chaud puis sortir
     if (collection === 'quartz_formulas') {
@@ -384,10 +457,9 @@ export default ({ filter, action }, { services, exceptions, logger, database, ge
         continue;
       }
       setTimeout(async () => {
-        logger.info(`[RealTime-Calc] 🔄 Starting setTimeout for ${collection}.${key}`);
+        logger.info(`[RealTime-Calc] �️ Safety net check for ${collection}.${key}`);
         try {
           const { ItemsService } = services;
-          logger.info(`[RealTime-Calc] 📦 Creating ItemsService for ${collection}`);
           const itemsService = new ItemsService(collection, {
             database,
             schema: schema || (typeof getSchema === 'function' ? await getSchema() : undefined),
@@ -395,15 +467,12 @@ export default ({ filter, action }, { services, exceptions, logger, database, ge
           });
 
           // Récupérer l'item mis à jour
-          logger.info(`[RealTime-Calc] 📖 Reading item ${key} from ${collection}`);
           const updatedItem = await itemsService.readOne(key);
-          logger.info(`[RealTime-Calc] ✅ Got item data for ${key}:`, JSON.stringify(updatedItem));
-          logger.debug(`[RealTime-Calc] Updated item data for ${key}:`, updatedItem);
+          logger.debug(`[RealTime-Calc] Item data for ${key}:`, updatedItem);
 
           // Calculer les champs avec optimisation des dépendances
           const changedFields = Object.keys(payload);
-          logger.info(`[RealTime-Calc] 🧮 Calling calculateFields for ${collection} with changedFields: ${changedFields.join(', ')}`);
-          logger.info(`[RealTime-Calc] 📊 formulaConfigs for ${collection}:`, JSON.stringify(formulaConfigs[collection]));
+          logger.debug(`[RealTime-Calc] Checking fields for ${collection}: ${changedFields.join(', ')}`);
           
           const { updates: calculatedUpdates, hasChanges } = calculateFields(
             collection, 
@@ -411,36 +480,32 @@ export default ({ filter, action }, { services, exceptions, logger, database, ge
             changedFields
           );
           
-          logger.info(`[RealTime-Calc] 📝 calculateFields returned: hasChanges=${hasChanges}, updates=${JSON.stringify(calculatedUpdates)}`);
-          logger.debug(`[RealTime-Calc] changedFields: ${changedFields.join(', ')}`);
-          logger.debug(`[RealTime-Calc] calculatedUpdates:`, calculatedUpdates);
+          logger.debug(`[RealTime-Calc] Safety net result: hasChanges=${hasChanges}, updates=${JSON.stringify(calculatedUpdates)}`);
 
           if (hasChanges && Object.keys(calculatedUpdates).length > 0) {
-            // Identifier les champs qui ont réellement changé
+            // Identifier les champs qui ont réellement changé (pas déjà calculés par le filter)
             const finalUpdates = {};
             Object.keys(calculatedUpdates).forEach(field => {
               if (!valuesAreEqual(calculatedUpdates[field], updatedItem[field])) {
                 finalUpdates[field] = calculatedUpdates[field];
-                logger.info(`[RealTime-Calc] Calculated field ${field} changed: ${updatedItem[field]} → ${calculatedUpdates[field]}`);
+                logger.info(`[RealTime-Calc] 🛡️ Safety net fixing field ${field}: ${updatedItem[field]} → ${calculatedUpdates[field]}`);
               }
             });
 
             if (Object.keys(finalUpdates).length > 0) {
-              // Faire un UPDATE séparé avec les champs calculés modifiés
-              // Marquer cet item comme mis à jour par NOUS pour ignorer le prochain items.update déclenché par Directus
+              // Le filter a manqué ces calculs → on les fait maintenant
               selfUpdates.add(loopKey);
               await itemsService.updateOne(key, finalUpdates);
-              logger.info(`[RealTime-Calc] ✅ Updated ${collection}.${key} with calculated fields:`, finalUpdates);
+              logger.info(`[RealTime-Calc] ✅ Safety net updated ${collection}.${key}:`, finalUpdates);
             } else {
-              logger.debug(`[RealTime-Calc] Calculated fields unchanged for ${collection}.${key}`);
+              logger.debug(`[RealTime-Calc] ✓ Filter already calculated everything for ${collection}.${key}`);
             }
           } else {
-            logger.debug(`[RealTime-Calc] No calculated fields to update for ${collection}.${key}`);
+            logger.debug(`[RealTime-Calc] ✓ No additional calculations needed for ${collection}.${key}`);
           }
 
         } catch (error) {
-          logger.error(`[RealTime-Calc] ❌ Error in items.update action for ${collection}.${key}:`);
-          logger.error(error);
+          logger.error(`[RealTime-Calc] ❌ Safety net error for ${collection}.${key}:`, error.message);
         }
       }, 100); // Délai de 100ms pour garantir que l'update est finalisé
     }

@@ -1,0 +1,409 @@
+/**
+ * Fluent Design Theme - Custom CSS pour Directus
+ * À coller dans Settings > Project Settings > Custom CSS
+ * 
+ * Version: 1.0.0
+ * Inspiration: Microsoft Fluent Design System
+ */
+
+/* ========================================
+   VARIABLES GLOBALES FLUENT
+   ======================================== */
+:root {
+  /* === Couleurs Primaires === */
+  --fluent-blue: #0078D4;
+  --fluent-blue-hover: #106EBE;
+  --fluent-purple: #8764B8;
+  
+  /* === Neutral Grays (Fluent) === */
+  --fluent-gray-10: #FAF9F8;
+  --fluent-gray-20: #F3F2F1;
+  --fluent-gray-30: #EDEBE9;
+  --fluent-gray-40: #E1DFDD;
+  --fluent-gray-130: #605E5C;
+  --fluent-gray-190: #323130;
+  --fluent-gray-210: #201F1E;
+  
+  /* === Status Colors === */
+  --fluent-success: #107C10;
+  --fluent-warning: #F7630C;
+  --fluent-danger: #D13438;
+  
+  /* === Override Directus Variables === */
+  --theme--primary: var(--fluent-blue);
+  --theme--primary-accent: var(--fluent-blue-hover);
+  --theme--secondary: var(--fluent-purple);
+  
+  --theme--foreground: var(--fluent-gray-190);
+  --theme--foreground-accent: var(--fluent-gray-210);
+  --theme--foreground-subdued: var(--fluent-gray-130);
+  
+  --theme--background: var(--fluent-gray-10);
+  --theme--background-normal: var(--fluent-gray-20);
+  --theme--background-accent: var(--fluent-gray-30);
+  --theme--background-subdued: #FFFFFF;
+  
+  --theme--border-color: var(--fluent-gray-30);
+  --theme--border-color-accent: var(--fluent-gray-40);
+  --theme--border-radius: 8px;
+  
+  --theme--success: var(--fluent-success);
+  --theme--warning: var(--fluent-warning);
+  --theme--danger: var(--fluent-danger);
+  
+  /* === Typography === */
+  --theme--fonts--sans--font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", "Helvetica Neue", sans-serif;
+  --theme--fonts--monospace--font-family: "Cascadia Code", "Consolas", "Courier New", monospace;
+}
+
+/* ========================================
+   TYPOGRAPHIE FLUENT
+   ======================================== */
+body {
+  font-family: var(--theme--fonts--sans--font-family);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-weight: 400;
+}
+
+h1, h2, h3, h4, h5, h6,
+.type-title,
+.type-label {
+  font-family: var(--theme--fonts--sans--font-family);
+  font-weight: 600;
+}
+
+code, pre,
+.monospace {
+  font-family: var(--theme--fonts--monospace--font-family);
+}
+
+/* ========================================
+   NAVIGATION MODULE (Effet Acrylic)
+   ======================================== */
+.module-bar {
+  background: var(--fluent-gray-20) !important;
+  border-right: 1px solid var(--fluent-gray-30);
+}
+
+.module-bar .module-nav button {
+  border-radius: 6px;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.module-bar .module-nav button:hover {
+  background: rgba(0, 120, 212, 0.08) !important;
+}
+
+.module-bar .module-nav button.active,
+.module-bar .module-nav button[aria-current="page"] {
+  background: rgba(0, 120, 212, 0.12) !important;
+  color: var(--fluent-blue) !important;
+}
+
+/* ========================================
+   NAVIGATION PROJET
+   ======================================== */
+.project-name {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* ========================================
+   HEADER (Fluent Depth)
+   ======================================== */
+.header-bar {
+  background: #FFFFFF !important;
+  border-bottom: 1px solid var(--fluent-gray-30);
+  box-shadow: 0 0.3px 0.9px rgba(0, 0, 0, 0.07), 
+              0 1.6px 3.6px rgba(0, 0, 0, 0.11) !important;
+}
+
+/* ========================================
+   BOUTONS FLUENT STYLE
+   ======================================== */
+.v-button {
+  border-radius: 6px !important;
+  font-weight: 500;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.v-button:not(.secondary):not(.warning):not(.danger) {
+  background: var(--fluent-blue) !important;
+  box-shadow: 0 1.6px 3.6px rgba(0, 120, 212, 0.2);
+}
+
+.v-button:not(.secondary):not(.warning):not(.danger):hover {
+  background: var(--fluent-blue-hover) !important;
+  box-shadow: 0 3.2px 7.2px rgba(0, 120, 212, 0.3);
+  transform: translateY(-1px);
+}
+
+.v-button:not(.secondary):not(.warning):not(.danger):active {
+  transform: translateY(0);
+  box-shadow: 0 0.6px 1.8px rgba(0, 120, 212, 0.15);
+}
+
+/* Bouton secondaire */
+.v-button.secondary {
+  background: var(--fluent-gray-20) !important;
+  color: var(--fluent-gray-190) !important;
+  border: 1px solid var(--fluent-gray-30);
+}
+
+.v-button.secondary:hover {
+  background: var(--fluent-gray-30) !important;
+  border-color: var(--fluent-gray-40);
+}
+
+/* ========================================
+   INPUTS & FORM FIELDS
+   ======================================== */
+.v-input input,
+.v-input textarea,
+.v-select .v-input,
+.input {
+  background: #FFFFFF !important;
+  border: 1px solid var(--fluent-gray-30) !important;
+  border-radius: 6px !important;
+  padding: 10px 12px !important;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.v-input input:hover,
+.v-input textarea:hover,
+.v-select .v-input:hover {
+  border-color: var(--fluent-blue) !important;
+}
+
+.v-input input:focus,
+.v-input textarea:focus,
+.v-select .v-input:focus {
+  border-color: var(--fluent-blue) !important;
+  box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2) !important;
+  outline: none;
+}
+
+/* Label des champs */
+.v-input .label,
+.field-label {
+  font-weight: 500;
+  color: var(--fluent-gray-190);
+  margin-bottom: 6px;
+}
+
+/* ========================================
+   CARDS & PANELS
+   ======================================== */
+.v-card,
+.card {
+  background: #FFFFFF !important;
+  border: 1px solid var(--fluent-gray-30) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 1.6px 3.6px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* ========================================
+   TABLES
+   ======================================== */
+.v-table {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.v-table thead {
+  background: var(--fluent-gray-20) !important;
+  font-weight: 600;
+}
+
+.v-table tbody tr:hover {
+  background: rgba(0, 120, 212, 0.04) !important;
+}
+
+.v-table tbody tr.selected {
+  background: rgba(0, 120, 212, 0.08) !important;
+}
+
+/* ========================================
+   SIDEBAR
+   ======================================== */
+.sidebar {
+  background: #FFFFFF !important;
+  border-left: 1px solid var(--fluent-gray-30);
+}
+
+.sidebar .sidebar-detail {
+  border-radius: 6px;
+}
+
+/* ========================================
+   MODALS & DIALOGS
+   ======================================== */
+.v-dialog,
+.v-overlay {
+  border-radius: 12px !important;
+  box-shadow: 0 6.4px 14.4px rgba(0, 0, 0, 0.132),
+              0 1.2px 3.6px rgba(0, 0, 0, 0.108) !important;
+}
+
+.v-dialog .dialog-header {
+  border-bottom: 1px solid var(--fluent-gray-30);
+  padding: 20px 24px;
+}
+
+.v-dialog .dialog-content {
+  padding: 24px;
+}
+
+/* ========================================
+   POPOVERS & MENUS
+   ======================================== */
+.v-menu,
+.v-list {
+  background: #FFFFFF !important;
+  border: 1px solid var(--fluent-gray-30) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 3.2px 7.2px rgba(0, 0, 0, 0.132),
+              0 0.6px 1.8px rgba(0, 0, 0, 0.108) !important;
+}
+
+.v-list .v-list-item:hover {
+  background: rgba(0, 120, 212, 0.06) !important;
+}
+
+.v-list .v-list-item.active {
+  background: rgba(0, 120, 212, 0.12) !important;
+  color: var(--fluent-blue) !important;
+}
+
+/* ========================================
+   FOCUS STATES (Fluent Focus Indicators)
+   ======================================== */
+*:focus-visible {
+  outline: 2px solid var(--fluent-blue) !important;
+  outline-offset: 2px !important;
+  border-radius: 4px;
+}
+
+/* ========================================
+   BADGES & CHIPS
+   ======================================== */
+.v-chip,
+.v-badge {
+  border-radius: 4px !important;
+  font-weight: 500;
+  padding: 4px 10px;
+}
+
+/* ========================================
+   NOTIFICATIONS
+   ======================================== */
+.v-notice {
+  border-radius: 8px !important;
+  border-left-width: 4px !important;
+  box-shadow: 0 1.6px 3.6px rgba(0, 0, 0, 0.1);
+}
+
+.v-notice.success {
+  border-left-color: var(--fluent-success) !important;
+  background: rgba(16, 124, 16, 0.08) !important;
+}
+
+.v-notice.warning {
+  border-left-color: var(--fluent-warning) !important;
+  background: rgba(247, 99, 12, 0.08) !important;
+}
+
+.v-notice.danger {
+  border-left-color: var(--fluent-danger) !important;
+  background: rgba(209, 52, 56, 0.08) !important;
+}
+
+/* ========================================
+   SCROLLBARS (Fluent Style)
+   ======================================== */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--fluent-gray-20);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--fluent-gray-130);
+  border-radius: 5px;
+  border: 2px solid var(--fluent-gray-20);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fluent-gray-190);
+}
+
+/* ========================================
+   ANIMATIONS FLUENT
+   ======================================== */
+@keyframes fluent-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in,
+.v-dialog,
+.v-menu {
+  animation: fluent-fade-in 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ========================================
+   TRANSITIONS GLOBALES
+   ======================================== */
+* {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ========================================
+   MODE DARK (Optionnel)
+   Active automatiquement si Directus est en dark mode
+   ======================================== */
+body.dark {
+  --fluent-gray-10: #1B1A19;
+  --fluent-gray-20: #252423;
+  --fluent-gray-30: #292827;
+  --fluent-gray-40: #3B3A39;
+  --fluent-gray-130: #A19F9D;
+  --fluent-gray-190: #F3F2F1;
+  --fluent-gray-210: #FFFFFF;
+  
+  --fluent-blue: #4CC2FF;
+  --fluent-blue-hover: #60CDFF;
+  
+  --fluent-success: #6CCB5F;
+  --fluent-warning: #FCE100;
+  --fluent-danger: #FF6B6B;
+}
+
+body.dark .header-bar {
+  background: var(--fluent-gray-20) !important;
+  box-shadow: 0 0.3px 0.9px rgba(0, 0, 0, 0.3), 
+              0 1.6px 3.6px rgba(0, 0, 0, 0.4) !important;
+}
+
+body.dark .v-card,
+body.dark .card {
+  background: var(--fluent-gray-20) !important;
+  border-color: var(--fluent-gray-40) !important;
+}
+
+body.dark .v-input input,
+body.dark .v-input textarea {
+  background: var(--fluent-gray-30) !important;
+  border-color: var(--fluent-gray-40) !important;
+  color: var(--fluent-gray-190);
+}

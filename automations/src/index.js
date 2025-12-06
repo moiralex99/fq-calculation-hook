@@ -36,7 +36,8 @@ export default ({ action, filter }, { services, database, logger, getSchema }) =
 
   async function loadAutomations() {
     try {
-      const service = new ItemsService('quartz_automations', { database, schema: await getSchema() });
+      const schema = await getSchema();
+      const service = new ItemsService('quartz_automations', { database, schema });
       const res = await service.readByQuery({
         limit: -1,
         sort: ['priority'],
@@ -174,6 +175,50 @@ export default ({ action, filter }, { services, database, logger, getSchema }) =
     }
   });
 
+  async function executeThrottledEvaluation({ key, rule, collection, meta, original, expandFields, timer }) {
+    try {
+      const schema = await getSchema();
+      const service = new ItemsService(collection, { database, schema, accountability: meta?.accountability });
+      let latestItem = null;
+      try {
+        latestItem = await service.readOne(
+          meta?.keys?.[0],
+          expandFields?.length ? { fields: expandFields } : undefined
+        );
+      } catch (readErr) {
+        logger.warn(
+          `[Automations] throttled read failed on ${collection}.${meta?.keys?.[0]}: ${
+            readErr?.message || readErr
+          }`
+        );
+      }
+      if (!latestItem) {
+        logger.warn(`[Automations] throttled rule ${rule.name || rule.id} skipped: item ${collection}.${meta?.keys?.[0]} missing`);
+        return;
+      }
+      const evaluationPayload = latestItem;
+      const updates = await engine.evaluate({
+        collection,
+        automations: [rule],
+        newData: evaluationPayload,
+        oldData: original,
+        context: { $USER: meta?.accountability?.user }
+      });
+      if (!updates || Object.keys(updates).length === 0) {
+        logger.info(`[Automations] throttled rule ${rule.name || rule.id} produced no updates`);
+        return;
+      }
+      const accountability = { user: meta?.accountability?.user, _automationTriggered: true };
+      await service.updateOne(meta?.keys?.[0], updates, { accountability });
+      logger.info(`[Automations] throttled updates applied on ${collection}.${meta?.keys?.[0]} => ${JSON.stringify(updates)}`);
+    } catch (e) {
+      logger.error('[Automations] throttled evaluate failed', e?.message || e);
+    } finally {
+      const current = throttleTimers.get(key);
+      if (current?.timer === timer) throttleTimers.delete(key);
+    }
+  }
+
   // Initial load
   loadAutomations();
 
@@ -249,39 +294,49 @@ export default ({ action, filter }, { services, database, logger, getSchema }) =
       if (updateAutomations.length === 0) return payload;
       
       const schema = await getSchema();
-  const service = new ItemsService(meta.collection, { database, schema });
+      const service = new ItemsService(meta.collection, { database, schema, accountability: meta?.accountability });
   // Optionally expand related fields if rule requests it (expand_fields: ['project.*','client.email'])
   const expandFields = collectExpandFields(updateAutomations, meta.collection);
   const original = await service.readOne(meta.keys?.[0], expandFields.length ? { fields: expandFields } : undefined);
       const changedKeys = Object.keys(payload || {}).filter((k) => !original || payload[k] !== original[k]);
       logger.info(`[Automations] items.update on ${meta.collection} id=${meta.keys?.[0]} changed=[${changedKeys.join(', ')}] rules=${updateAutomations.length}`);
       // Throttle per automation if configured
-      const results = {};
+      const immediateResults = {};
       const promises = [];
       for (const rule of updateAutomations) {
         const throttleMs = Number(rule.throttle_ms) || 0;
         const scope = rule.throttle_scope || 'rule';
         if (throttleMs > 0) {
           const key = makeThrottleKey({ rule, collection: meta.collection, meta, scope });
-          if (throttleTimers.has(key)) clearTimeout(throttleTimers.get(key).timer);
-          // store latest payload for this key
-          const record = throttleTimers.get(key) || { lastPayload: null, lastOriginal: null };
-          record.lastPayload = payload;
-          record.lastOriginal = original;
-          const timer = setTimeout(async () => {
-            try {
-              const updates = await engine.evaluate({
-                collection: meta.collection,
-                automations: [rule],
-                newData: record.lastPayload,
-                oldData: record.lastOriginal,
-                context: { $USER: meta?.accountability?.user }
-              });
-              Object.assign(results, updates);
-            } catch (e) { logger.error('[Automations] throttled evaluate failed', e?.message || e); }
-            throttleTimers.delete(key);
+          const existing = throttleTimers.get(key);
+          if (existing?.timer) clearTimeout(existing.timer);
+          const metaSnapshot = {
+            collection: meta.collection,
+            keys: meta?.keys,
+            accountability: meta?.accountability
+          };
+          const ruleExpandFields = collectExpandFields([rule], meta.collection);
+          const record = {
+            rule,
+            collection: meta.collection,
+            meta: metaSnapshot,
+            original,
+            expandFields: ruleExpandFields
+          };
+          const timer = setTimeout(() => {
+            executeThrottledEvaluation({
+              key,
+              rule: record.rule,
+              collection: record.collection,
+              meta: record.meta,
+              original: record.original,
+              expandFields: record.expandFields,
+              timer
+            });
           }, throttleMs);
-          throttleTimers.set(key, { ...record, timer });
+          record.timer = timer;
+          throttleTimers.set(key, record);
+          logger.info(`[Automations] throttling rule ${rule.name || rule.id} for ${throttleMs}ms (scope=${scope})`);
         } else {
           promises.push(engine.evaluate({
             collection: meta.collection,
@@ -289,20 +344,57 @@ export default ({ action, filter }, { services, database, logger, getSchema }) =
             newData: payload,
             oldData: original,
             context: { $USER: meta?.accountability?.user }
-          }).then(updates => Object.assign(results, updates)).catch(e => logger.error('[Automations] evaluate failed', e?.message || e)));
+          }).then(updates => Object.assign(immediateResults, updates)).catch(e => logger.error('[Automations] evaluate failed', e?.message || e)));
         }
       }
       await Promise.all(promises);
-      if (Object.keys(results).length > 0) {
-        logger.info(`[Automations] updates computed → ${JSON.stringify(results)}`);
+      if (Object.keys(immediateResults).length > 0) {
+        logger.info(`[Automations] updates computed → ${JSON.stringify(immediateResults)}`);
       } else {
         logger.info('[Automations] no updates computed');
       }
-      return { ...payload, ...results };
+      return { ...payload, ...immediateResults };
     } catch (err) {
       logger.error('[Automations] Error in items.update:', err?.message || err);
       return payload;
     }
+  });
+  
+  // Intercept DELETE before commit to evaluate rules while the record still exists
+  filter('items.delete', async (payload, meta) => {
+    try {
+      if (meta?.accountability?._automationTriggered) {
+        logger.info(`[Automations] items.delete on ${meta?.collection} SKIPPED (automation-triggered)`);
+        return payload;
+      }
+      if (meta?.collection === 'quartz_automations') {
+        logger.info(`[Automations] items.delete on quartz_automations detected, scheduling reload`);
+        scheduleReload('items.delete on quartz_automations');
+        return payload;
+      }
+      const deleteAutomations = filterAutomationsByEvent(automations, 'delete')
+        .filter(a => matchesCollection(a, meta?.collection));
+      if (deleteAutomations.length === 0) return payload;
+      if (!meta?.keys?.[0]) {
+        logger.warn('[Automations] items.delete missing primary key, skipping evaluation');
+        return payload;
+      }
+      const schema = await getSchema();
+      const service = new ItemsService(meta.collection, { database, schema, accountability: meta?.accountability });
+      const expandFields = collectExpandFields(deleteAutomations, meta.collection);
+      const original = await service.readOne(meta.keys[0], expandFields.length ? { fields: expandFields } : undefined);
+      await engine.evaluate({
+        collection: meta.collection,
+        automations: deleteAutomations,
+        newData: null,
+        oldData: original,
+        context: { $USER: meta?.accountability?.user }
+      });
+      logger.info(`[Automations] items.delete on ${meta.collection} id=${meta.keys[0]} evaluated by ${deleteAutomations.length} rule(s)`);
+    } catch (err) {
+      logger.error('[Automations] Error in items.delete:', err?.message || err);
+    }
+    return payload;
   });
   
   // Move CREATE processing to an ACTION (post-commit) to ensure DB consistency for lookups
@@ -330,7 +422,7 @@ export default ({ action, filter }, { services, database, logger, getSchema }) =
 
       // Read the freshly created item to use as newData
       const schema = await getSchema();
-      const service = new services.ItemsService(collection, { database, schema });
+      const service = new services.ItemsService(collection, { database, schema, accountability: meta?.accountability });
       // Optionally honor expand fields
       const expandFields = collectExpandFields(createAutomations, collection);
       const createdItem = await service.readOne(key, expandFields.length ? { fields: expandFields } : undefined);
